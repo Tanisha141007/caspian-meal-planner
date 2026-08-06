@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ household.name }} - Family view{% endblock %}
+{% block content %}
+  <div class="nav-tabs">
+    <a class="active" href="/family/{{ household.id }}">Family view</a>
+    <a href="/cook/{{ household.id }}">Cook view</a>
+    <a href="/family/{{ household.id }}/month">Monthly shopping list</a>
+    <a href="/">&larr; All households</a>
+  </div>
+
+  <h1>{{ household.name }} household</h1>
+  <p class="subtitle">Cook: {{ household.cook_name }} ({{ household.cook_phone }})</p>
+
+  <div class="card">
+    <h2>Diet profile</h2>
+    <form method="post" action="/family/{{ household.id }}/edit">
+      <div class="grid-2">
+        <div>
+          <label>Family name</label>
+          <input name="name" value="{{ household.name }}" required>
+        </div>
+        <div>
+          <label>Cook's name</label>
+          <input name="cook_name" value="{{ household.cook_name }}" required>
+        </div>
+        <div>
+          <label>Cook's phone</label>
+          <input name="cook_phone" value="{{ household.cook_phone }}" required>
+        </div>
+        <div>
+          <label>Diet type</label>
+          <select name="diet_type">
+            {% for opt in ["veg", "vegan", "jain", "eggetarian", "non-veg"] %}
+              <option value="{{ opt }}" {{ "selected" if household.diet_type == opt }}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Spice level</label>
+          <select name="spice_level">
+            {% for opt in ["mild", "medium", "hot"] %}
+              <option value="{{ opt }}" {{ "selected" if household.spice_level == opt }}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Family size (servings)</label>
+          <input type="number" name="family_size" value="{{ household.family_size }}" min="1">
+        </div>
+        <div>
+          <label>Kids count</label>
+          <input type="number" name="kids_count" value="{{ household.kids_count }}" min="0">
+        </div>
+      </div>
+
+      <label>Allergies</label>
+      <input name="allergies" value="{{ household.allergies|join(', ') }}">
+
+      <label>Disliked ingredients</label>
+      <input name="disliked_ingredients" value="{{ household.disliked_ingredients|join(', ') }}">
+
+      <label>Preferred cuisines</label>
+      <input name="preferred_cuisines" value="{{ household.preferred_cuisines|join(', ') }}">
+
+      <label>Notes for the meal planner</label>
+      <textarea name="notes" rows="2">{{ household.notes }}</textarea>
+
+      <div style="margin-top: 16px;">
+        <button class="btn" type="submit">Save profile</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Weekly meal chart</h2>
+    {% if plan %}
+      <p class="subtitle" style="margin-bottom: 12px;">Week of {{ plan.period_start.strftime('%d %b %Y') }}</p>
+      <div style="overflow-x: auto;">
+        <table class="week-chart">
+          <thead>
+            <tr>
+              <th>Day</th>
+              {% for slot in meal_slots %}<th>{{ slot|capitalize }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for day in week_days %}
+              <tr class="{{ 'today' if day.is_today }}">
+                <td>{{ day.date.strftime('%a %d %b') }}{% if day.is_today %} (today){% endif %}</td>
+                {% for slot in meal_slots %}
+                  <td>{{ day.slots.get(slot, '-') }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">No plan generated yet.</div>
+    {% endif %}
+    <form method="post" action="/family/{{ household.id }}/generate-week" style="margin-top: 16px;">
+      <button class="btn" type="submit">{{ 'Regenerate' if plan else 'Generate' }} this week's plan</button>
+    </form>
+  </div>
+{% endblock %}

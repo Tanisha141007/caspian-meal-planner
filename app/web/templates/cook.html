@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ household.name }} - Cook view{% endblock %}
+{% block content %}
+  <div class="nav-tabs">
+    <a href="/family/{{ household.id }}">Family view</a>
+    <a class="active" href="/cook/{{ household.id }}">Cook view</a>
+    <a href="/family/{{ household.id }}/month">Monthly shopping list</a>
+    <a href="/">&larr; All households</a>
+  </div>
+
+  <h1>Today for {{ household.cook_name }}</h1>
+  <p class="subtitle">{{ today.strftime('%A, %d %B %Y') }} &middot; {{ household.name }} household</p>
+
+  {% if meal_cards %}
+    {% for m in meal_cards %}
+      <div class="meal-card">
+        <div class="slot-label">{{ m.slot }} &middot; {{ m.servings|round(1) }} servings</div>
+        <h3>{{ m.names }}</h3>
+        <div class="ingredients">{{ m.ingredients|join(', ') }}</div>
+        {% if m.note %}<div class="note">{{ m.note }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="card empty-state">No plan for today yet - generate this week's plan from the family view first.</div>
+  {% endif %}
+
+  {% if message_preview %}
+    <div class="card">
+      <h2>What this looks like as a text message</h2>
+      <div class="phone-mock">
+        <div class="chat-label">Sent via Caspian (SMS today, WhatsApp when live)</div>
+        <div class="chat-bubble outbound">{{ message_preview }}</div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Reply as the cook</h2>
+    <p class="subtitle" style="margin-bottom: 10px;">
+      Simulates the cook texting back - Claude reads it the same way it would over WhatsApp/SMS.
+    </p>
+    <form method="post" action="/cook/{{ household.id }}/feedback">
+      <input name="message_text" placeholder="e.g. Kids didn't like the bhindi today, too spicy" required>
+      <div style="margin-top: 10px;">
+        <button class="btn" type="submit">Send reply</button>
+      </div>
+    </form>
+
+    {% if recent_feedback %}
+      <div style="margin-top: 18px;">
+        {% for f in recent_feedback %}
+          <div class="feedback-item">
+            <span class="intent-tag {{ f.parsed_intent.get('type', 'other') }}">{{ f.parsed_intent.get('type', 'other') }}</span>
+            <div style="margin-top: 6px;">&ldquo;{{ f.raw_text }}&rdquo;</div>
+            <div class="meta" style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">{{ f.created_at.strftime('%d %b, %H:%M') }} UTC</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

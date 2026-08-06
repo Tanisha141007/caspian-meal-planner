@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Households - Caspian Meal Planner{% endblock %}
+{% block content %}
+  <h1>Households</h1>
+  <p class="subtitle">Each household is one family whose cook gets a daily WhatsApp/SMS message.</p>
+
+  {% if households %}
+    <div class="card-list">
+      {% for h in households %}
+        <div class="household-row">
+          <div>
+            <strong>{{ h.name }}</strong>
+            <div class="meta">Cook: {{ h.cook_name }} ({{ h.cook_phone }}) &middot; {{ h.diet_type }} &middot; serves {{ h.family_size }}</div>
+          </div>
+          <div class="pill-row">
+            <a class="btn secondary" href="/family/{{ h.id }}">Family view</a>
+            <a class="btn" href="/cook/{{ h.id }}">Cook view</a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card empty-state">No households yet. Add the first one to get started.</div>
+  {% endif %}
+
+  <div style="margin-top: 20px;">
+    <a class="btn" href="/households/new">+ Add household</a>
+  </div>
+{% endblock %}

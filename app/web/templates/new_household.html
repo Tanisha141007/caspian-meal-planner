@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Add household{% endblock %}
+{% block container_class %} narrow{% endblock %}
+{% block content %}
+  <h1>Add a household</h1>
+  <p class="subtitle">This is what the family fills in once, up front.</p>
+
+  <form method="post" action="/households/new" class="card">
+    <label>Family name</label>
+    <input name="name" required placeholder="Malani">
+
+    <label>Cook's name</label>
+    <input name="cook_name" required placeholder="Radha">
+
+    <label>Cook's phone (E.164)</label>
+    <input name="cook_phone" required placeholder="+919812345678">
+
+    <div class="grid-2">
+      <div>
+        <label>Diet type</label>
+        <select name="diet_type">
+          <option value="veg">Vegetarian</option>
+          <option value="vegan">Vegan</option>
+          <option value="jain">Jain</option>
+          <option value="eggetarian">Eggetarian</option>
+          <option value="non-veg">Non-vegetarian</option>
+        </select>
+      </div>
+      <div>
+        <label>Spice level</label>
+        <select name="spice_level">
+          <option value="mild">Mild</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hot">Hot</option>
+        </select>
+      </div>
+      <div>
+        <label>Family size (servings)</label>
+        <input type="number" name="family_size" value="4" min="1">
+      </div>
+      <div>
+        <label>Kids count</label>
+        <input type="number" name="kids_count" value="0" min="0">
+      </div>
+    </div>
+
+    <label>Allergies (comma separated)</label>
+    <input name="allergies" placeholder="peanut, dairy">
+
+    <label>Disliked ingredients (comma separated)</label>
+    <input name="disliked_ingredients" placeholder="bitter gourd">
+
+    <label>Preferred cuisines (comma separated)</label>
+    <input name="preferred_cuisines" placeholder="gujarati, punjabi">
+
+    <label>Notes for the meal planner</label>
+    <textarea name="notes" rows="3" placeholder="Kids prefer less spicy food. Fasting on Ekadashi."></textarea>
+
+    <div style="margin-top: 18px;">
+      <button class="btn" type="submit">Create household</button>
+      <a class="btn secondary" href="/">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

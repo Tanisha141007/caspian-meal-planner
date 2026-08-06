@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ household.name }} - Monthly shopping list{% endblock %}
+{% block content %}
+  <div class="nav-tabs">
+    <a href="/family/{{ household.id }}">Family view</a>
+    <a href="/cook/{{ household.id }}">Cook view</a>
+    <a class="active" href="/family/{{ household.id }}/month">Monthly shopping list</a>
+    <a href="/">&larr; All households</a>
+  </div>
+
+  <h1>Monthly shopping list</h1>
+  <p class="subtitle">4-week rollup starting {{ month_start.strftime('%d %b %Y') }} - the aggregated ingredient list Caspian's monthly job would text the cook.</p>
+
+  <div class="card">
+    {% if shopping_list %}
+      <ul class="shopping-list">
+        {% for i in shopping_list %}
+          <li>{{ i.item }} - {{ i.qty }}{{ i.unit }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty-state">No meal plan data for this month yet.</div>
+    {% endif %}
+    <form method="post" action="/family/{{ household.id }}/generate-month" style="margin-top: 16px;">
+      <button class="btn" type="submit">{{ 'Regenerate' if shopping_list else 'Generate' }} this month's plan (4 weeks)</button>
+    </form>
+  </div>
+{% endblock %}

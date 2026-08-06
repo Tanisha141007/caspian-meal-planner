@@ -1,0 +1,431 @@
+[
+  {
+    "id": "poha", "name": "Poha", "region": "west", "cuisine_style": "maharashtrian",
+    "meal_types": ["breakfast"], "diet": "veg", "spice_level": "mild", "prep_time_min": 20,
+    "tags": ["kid-friendly", "light"],
+    "ingredients": [
+      {"item": "flattened rice (poha)", "qty": 60, "unit": "g"},
+      {"item": "onion", "qty": 0.3, "unit": "pc"},
+      {"item": "potato", "qty": 0.3, "unit": "pc"},
+      {"item": "mustard seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "curry leaves", "qty": 3, "unit": "leaves"},
+      {"item": "turmeric", "qty": 0.25, "unit": "tsp"},
+      {"item": "peanuts", "qty": 10, "unit": "g"},
+      {"item": "lemon", "qty": 0.25, "unit": "pc"},
+      {"item": "coriander leaves", "qty": 3, "unit": "g"}
+    ]
+  },
+  {
+    "id": "upma", "name": "Upma", "region": "south", "cuisine_style": "south-indian",
+    "meal_types": ["breakfast"], "diet": "veg", "spice_level": "mild", "prep_time_min": 20,
+    "tags": ["kid-friendly", "light"],
+    "ingredients": [
+      {"item": "semolina (rava)", "qty": 50, "unit": "g"},
+      {"item": "onion", "qty": 0.25, "unit": "pc"},
+      {"item": "mustard seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "urad dal", "qty": 5, "unit": "g"},
+      {"item": "curry leaves", "qty": 3, "unit": "leaves"},
+      {"item": "green chili", "qty": 0.5, "unit": "pc"},
+      {"item": "carrot", "qty": 15, "unit": "g"},
+      {"item": "peas", "qty": 15, "unit": "g"}
+    ]
+  },
+  {
+    "id": "idli_sambar", "name": "Idli with Sambar", "region": "south", "cuisine_style": "tamil",
+    "meal_types": ["breakfast"], "diet": "veg", "spice_level": "mild", "prep_time_min": 30,
+    "tags": ["kid-friendly", "steamed", "light"],
+    "ingredients": [
+      {"item": "idli batter", "qty": 150, "unit": "g"},
+      {"item": "toor dal", "qty": 30, "unit": "g"},
+      {"item": "tamarind pulp", "qty": 10, "unit": "g"},
+      {"item": "sambar powder", "qty": 1, "unit": "tsp"},
+      {"item": "drumstick", "qty": 20, "unit": "g"},
+      {"item": "shallots", "qty": 20, "unit": "g"}
+    ]
+  },
+  {
+    "id": "masala_dosa", "name": "Masala Dosa", "region": "south", "cuisine_style": "karnataka",
+    "meal_types": ["breakfast"], "diet": "veg", "spice_level": "medium", "prep_time_min": 35,
+    "tags": [],
+    "ingredients": [
+      {"item": "dosa batter", "qty": 150, "unit": "g"},
+      {"item": "potato", "qty": 1, "unit": "pc"},
+      {"item": "onion", "qty": 0.3, "unit": "pc"},
+      {"item": "mustard seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "turmeric", "qty": 0.25, "unit": "tsp"},
+      {"item": "coconut chutney", "qty": 30, "unit": "g"}
+    ]
+  },
+  {
+    "id": "aloo_paratha", "name": "Aloo Paratha", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["breakfast", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 30,
+    "tags": ["kid-friendly"],
+    "ingredients": [
+      {"item": "wheat flour", "qty": 80, "unit": "g"},
+      {"item": "potato", "qty": 1, "unit": "pc"},
+      {"item": "ginger", "qty": 3, "unit": "g"},
+      {"item": "green chili", "qty": 0.5, "unit": "pc"},
+      {"item": "ghee", "qty": 10, "unit": "g"},
+      {"item": "curd", "qty": 30, "unit": "g"}
+    ]
+  },
+  {
+    "id": "besan_chilla", "name": "Besan Chilla", "region": "north", "cuisine_style": "gujarati",
+    "meal_types": ["breakfast"], "diet": "veg", "spice_level": "mild", "prep_time_min": 15,
+    "tags": ["light", "high-protein"],
+    "ingredients": [
+      {"item": "gram flour (besan)", "qty": 60, "unit": "g"},
+      {"item": "onion", "qty": 0.2, "unit": "pc"},
+      {"item": "tomato", "qty": 0.2, "unit": "pc"},
+      {"item": "turmeric", "qty": 0.25, "unit": "tsp"},
+      {"item": "carom seeds (ajwain)", "qty": 0.25, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "moong_dal_chilla", "name": "Moong Dal Chilla", "region": "north", "cuisine_style": "pan-india",
+    "meal_types": ["breakfast"], "diet": "veg", "spice_level": "mild", "prep_time_min": 20,
+    "tags": ["high-protein", "light"],
+    "ingredients": [
+      {"item": "split moong dal", "qty": 60, "unit": "g"},
+      {"item": "ginger", "qty": 3, "unit": "g"},
+      {"item": "green chili", "qty": 0.5, "unit": "pc"},
+      {"item": "cumin seeds", "qty": 0.5, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "vegetable_daliya", "name": "Vegetable Daliya (broken wheat)", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["breakfast"], "diet": "veg", "spice_level": "mild", "prep_time_min": 25,
+    "tags": ["light", "high-fiber", "kid-friendly"],
+    "ingredients": [
+      {"item": "broken wheat (daliya)", "qty": 50, "unit": "g"},
+      {"item": "carrot", "qty": 20, "unit": "g"},
+      {"item": "peas", "qty": 20, "unit": "g"},
+      {"item": "onion", "qty": 0.2, "unit": "pc"},
+      {"item": "cumin seeds", "qty": 0.5, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "egg_bhurji", "name": "Egg Bhurji", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["breakfast", "dinner"], "diet": "egg", "spice_level": "medium", "prep_time_min": 15,
+    "tags": ["high-protein"],
+    "ingredients": [
+      {"item": "egg", "qty": 2, "unit": "pc"},
+      {"item": "onion", "qty": 0.3, "unit": "pc"},
+      {"item": "tomato", "qty": 0.3, "unit": "pc"},
+      {"item": "green chili", "qty": 0.5, "unit": "pc"},
+      {"item": "turmeric", "qty": 0.25, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "dal_tadka", "name": "Dal Tadka", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 30,
+    "tags": ["kid-friendly", "high-protein"],
+    "ingredients": [
+      {"item": "toor dal", "qty": 60, "unit": "g"},
+      {"item": "tomato", "qty": 0.5, "unit": "pc"},
+      {"item": "garlic", "qty": 2, "unit": "cloves"},
+      {"item": "cumin seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "ghee", "qty": 5, "unit": "g"},
+      {"item": "turmeric", "qty": 0.25, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "rajma", "name": "Rajma (kidney bean curry)", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 45,
+    "tags": ["high-protein"],
+    "ingredients": [
+      {"item": "kidney beans (rajma)", "qty": 50, "unit": "g dry"},
+      {"item": "onion", "qty": 0.5, "unit": "pc"},
+      {"item": "tomato", "qty": 1, "unit": "pc"},
+      {"item": "ginger-garlic paste", "qty": 5, "unit": "g"},
+      {"item": "garam masala", "qty": 0.5, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "chole", "name": "Chole (chickpea curry)", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 40,
+    "tags": ["high-protein"],
+    "ingredients": [
+      {"item": "chickpeas (chole)", "qty": 50, "unit": "g dry"},
+      {"item": "onion", "qty": 0.5, "unit": "pc"},
+      {"item": "tomato", "qty": 1, "unit": "pc"},
+      {"item": "chole masala", "qty": 1, "unit": "tsp"},
+      {"item": "ginger-garlic paste", "qty": 5, "unit": "g"}
+    ]
+  },
+  {
+    "id": "sambar", "name": "Sambar", "region": "south", "cuisine_style": "tamil",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 35,
+    "tags": ["high-protein"],
+    "ingredients": [
+      {"item": "toor dal", "qty": 50, "unit": "g"},
+      {"item": "drumstick", "qty": 30, "unit": "g"},
+      {"item": "tamarind pulp", "qty": 10, "unit": "g"},
+      {"item": "sambar powder", "qty": 1, "unit": "tsp"},
+      {"item": "shallots", "qty": 20, "unit": "g"}
+    ]
+  },
+  {
+    "id": "kadhi", "name": "Kadhi", "region": "north", "cuisine_style": "gujarati",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 30,
+    "tags": [],
+    "ingredients": [
+      {"item": "curd", "qty": 100, "unit": "g"},
+      {"item": "gram flour (besan)", "qty": 20, "unit": "g"},
+      {"item": "curry leaves", "qty": 3, "unit": "leaves"},
+      {"item": "mustard seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "green chili", "qty": 0.5, "unit": "pc"}
+    ]
+  },
+  {
+    "id": "palak_paneer", "name": "Palak Paneer", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 35,
+    "tags": ["high-protein", "kid-friendly"],
+    "ingredients": [
+      {"item": "spinach (palak)", "qty": 150, "unit": "g"},
+      {"item": "paneer", "qty": 60, "unit": "g"},
+      {"item": "onion", "qty": 0.3, "unit": "pc"},
+      {"item": "tomato", "qty": 0.3, "unit": "pc"},
+      {"item": "cream", "qty": 10, "unit": "g"}
+    ]
+  },
+  {
+    "id": "paneer_butter_masala", "name": "Paneer Butter Masala", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 35,
+    "tags": ["kid-friendly", "rich"],
+    "ingredients": [
+      {"item": "paneer", "qty": 70, "unit": "g"},
+      {"item": "tomato", "qty": 1, "unit": "pc"},
+      {"item": "cashew paste", "qty": 15, "unit": "g"},
+      {"item": "butter", "qty": 10, "unit": "g"},
+      {"item": "cream", "qty": 15, "unit": "g"}
+    ]
+  },
+  {
+    "id": "baingan_bharta", "name": "Baingan Bharta", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 30,
+    "tags": [],
+    "ingredients": [
+      {"item": "eggplant (baingan)", "qty": 150, "unit": "g"},
+      {"item": "onion", "qty": 0.4, "unit": "pc"},
+      {"item": "tomato", "qty": 0.4, "unit": "pc"},
+      {"item": "garlic", "qty": 2, "unit": "cloves"},
+      {"item": "green chili", "qty": 0.5, "unit": "pc"}
+    ]
+  },
+  {
+    "id": "bhindi_masala", "name": "Bhindi Masala", "region": "north", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 25,
+    "tags": [],
+    "ingredients": [
+      {"item": "okra (bhindi)", "qty": 150, "unit": "g"},
+      {"item": "onion", "qty": 0.3, "unit": "pc"},
+      {"item": "tomato", "qty": 0.2, "unit": "pc"},
+      {"item": "coriander powder", "qty": 0.5, "unit": "tsp"},
+      {"item": "amchur (dry mango powder)", "qty": 0.25, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "aloo_gobi", "name": "Aloo Gobi", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 30,
+    "tags": ["kid-friendly"],
+    "ingredients": [
+      {"item": "potato", "qty": 1, "unit": "pc"},
+      {"item": "cauliflower (gobi)", "qty": 120, "unit": "g"},
+      {"item": "cumin seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "turmeric", "qty": 0.25, "unit": "tsp"},
+      {"item": "coriander leaves", "qty": 3, "unit": "g"}
+    ]
+  },
+  {
+    "id": "chana_masala", "name": "Chana Masala", "region": "north", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "medium", "prep_time_min": 35,
+    "tags": ["high-protein"],
+    "ingredients": [
+      {"item": "chickpeas", "qty": 50, "unit": "g dry"},
+      {"item": "onion", "qty": 0.4, "unit": "pc"},
+      {"item": "tomato", "qty": 0.5, "unit": "pc"},
+      {"item": "garam masala", "qty": 0.5, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "malai_kofta", "name": "Malai Kofta", "region": "north", "cuisine_style": "punjabi",
+    "meal_types": ["dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 45,
+    "tags": ["rich", "festive"],
+    "ingredients": [
+      {"item": "paneer", "qty": 50, "unit": "g"},
+      {"item": "potato", "qty": 0.5, "unit": "pc"},
+      {"item": "cashew paste", "qty": 20, "unit": "g"},
+      {"item": "cream", "qty": 20, "unit": "g"},
+      {"item": "tomato", "qty": 0.5, "unit": "pc"}
+    ]
+  },
+  {
+    "id": "mixed_veg_curry", "name": "Mixed Vegetable Curry", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 25,
+    "tags": ["kid-friendly", "light"],
+    "ingredients": [
+      {"item": "carrot", "qty": 30, "unit": "g"},
+      {"item": "beans", "qty": 30, "unit": "g"},
+      {"item": "peas", "qty": 30, "unit": "g"},
+      {"item": "potato", "qty": 0.5, "unit": "pc"},
+      {"item": "cumin seeds", "qty": 0.5, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "chicken_curry", "name": "Chicken Curry", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "non-veg", "spice_level": "hot", "prep_time_min": 45,
+    "tags": ["high-protein"],
+    "ingredients": [
+      {"item": "chicken", "qty": 150, "unit": "g"},
+      {"item": "onion", "qty": 0.5, "unit": "pc"},
+      {"item": "tomato", "qty": 0.5, "unit": "pc"},
+      {"item": "ginger-garlic paste", "qty": 8, "unit": "g"},
+      {"item": "garam masala", "qty": 0.5, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "egg_curry", "name": "Egg Curry", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "egg", "spice_level": "medium", "prep_time_min": 30,
+    "tags": ["high-protein"],
+    "ingredients": [
+      {"item": "egg", "qty": 2, "unit": "pc"},
+      {"item": "onion", "qty": 0.4, "unit": "pc"},
+      {"item": "tomato", "qty": 0.4, "unit": "pc"},
+      {"item": "ginger-garlic paste", "qty": 5, "unit": "g"}
+    ]
+  },
+  {
+    "id": "fish_curry", "name": "Fish Curry", "region": "east", "cuisine_style": "bengali",
+    "meal_types": ["lunch", "dinner"], "diet": "non-veg", "spice_level": "medium", "prep_time_min": 35,
+    "tags": ["high-protein"],
+    "ingredients": [
+      {"item": "fish fillet", "qty": 150, "unit": "g"},
+      {"item": "mustard paste", "qty": 15, "unit": "g"},
+      {"item": "turmeric", "qty": 0.5, "unit": "tsp"},
+      {"item": "green chili", "qty": 1, "unit": "pc"},
+      {"item": "mustard oil", "qty": 10, "unit": "ml"}
+    ]
+  },
+  {
+    "id": "mutton_curry", "name": "Mutton Curry", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["dinner"], "diet": "non-veg", "spice_level": "hot", "prep_time_min": 60,
+    "tags": ["festive", "high-protein"],
+    "ingredients": [
+      {"item": "mutton", "qty": 150, "unit": "g"},
+      {"item": "onion", "qty": 0.5, "unit": "pc"},
+      {"item": "tomato", "qty": 0.5, "unit": "pc"},
+      {"item": "ginger-garlic paste", "qty": 10, "unit": "g"},
+      {"item": "garam masala", "qty": 1, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "jeera_rice", "name": "Jeera Rice", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 20,
+    "tags": ["kid-friendly", "staple"],
+    "ingredients": [
+      {"item": "basmati rice", "qty": 70, "unit": "g"},
+      {"item": "cumin seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "ghee", "qty": 5, "unit": "g"}
+    ]
+  },
+  {
+    "id": "steamed_rice", "name": "Steamed Rice", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 20,
+    "tags": ["staple"],
+    "ingredients": [
+      {"item": "rice", "qty": 70, "unit": "g"}
+    ]
+  },
+  {
+    "id": "roti", "name": "Roti / Chapati", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 20,
+    "tags": ["kid-friendly", "staple"],
+    "ingredients": [
+      {"item": "wheat flour", "qty": 60, "unit": "g"},
+      {"item": "ghee", "qty": 3, "unit": "g"}
+    ]
+  },
+  {
+    "id": "curd_rice", "name": "Curd Rice", "region": "south", "cuisine_style": "south-indian",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 15,
+    "tags": ["light", "cooling", "kid-friendly"],
+    "ingredients": [
+      {"item": "rice", "qty": 60, "unit": "g"},
+      {"item": "curd", "qty": 100, "unit": "g"},
+      {"item": "mustard seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "curry leaves", "qty": 3, "unit": "leaves"},
+      {"item": "pomegranate (garnish)", "qty": 10, "unit": "g"}
+    ]
+  },
+  {
+    "id": "veg_pulao", "name": "Vegetable Pulao", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 30,
+    "tags": ["kid-friendly"],
+    "ingredients": [
+      {"item": "basmati rice", "qty": 70, "unit": "g"},
+      {"item": "mixed vegetables", "qty": 60, "unit": "g"},
+      {"item": "whole garam masala", "qty": 1, "unit": "set"},
+      {"item": "ghee", "qty": 8, "unit": "g"}
+    ]
+  },
+  {
+    "id": "dhokla", "name": "Dhokla", "region": "west", "cuisine_style": "gujarati",
+    "meal_types": ["snack"], "diet": "veg", "spice_level": "mild", "prep_time_min": 30,
+    "tags": ["steamed", "light", "kid-friendly"],
+    "ingredients": [
+      {"item": "gram flour (besan)", "qty": 60, "unit": "g"},
+      {"item": "curd", "qty": 20, "unit": "g"},
+      {"item": "eno / fruit salt", "qty": 0.5, "unit": "tsp"},
+      {"item": "mustard seeds", "qty": 0.5, "unit": "tsp"},
+      {"item": "green chili", "qty": 0.5, "unit": "pc"}
+    ]
+  },
+  {
+    "id": "samosa", "name": "Samosa", "region": "north", "cuisine_style": "pan-india",
+    "meal_types": ["snack"], "diet": "veg", "spice_level": "medium", "prep_time_min": 40,
+    "tags": ["fried", "festive"],
+    "ingredients": [
+      {"item": "maida (refined flour)", "qty": 50, "unit": "g"},
+      {"item": "potato", "qty": 0.5, "unit": "pc"},
+      {"item": "peas", "qty": 15, "unit": "g"},
+      {"item": "garam masala", "qty": 0.25, "unit": "tsp"},
+      {"item": "oil for frying", "qty": 30, "unit": "ml"}
+    ]
+  },
+  {
+    "id": "sprouts_chaat", "name": "Sprouts Chaat", "region": "west", "cuisine_style": "pan-india",
+    "meal_types": ["snack"], "diet": "vegan", "spice_level": "mild", "prep_time_min": 10,
+    "tags": ["light", "high-fiber", "no-cook"],
+    "ingredients": [
+      {"item": "mixed sprouts", "qty": 80, "unit": "g"},
+      {"item": "onion", "qty": 0.2, "unit": "pc"},
+      {"item": "tomato", "qty": 0.2, "unit": "pc"},
+      {"item": "lemon", "qty": 0.25, "unit": "pc"},
+      {"item": "chaat masala", "qty": 0.25, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "dahi_vada", "name": "Dahi Vada", "region": "north", "cuisine_style": "pan-india",
+    "meal_types": ["snack"], "diet": "veg", "spice_level": "mild", "prep_time_min": 40,
+    "tags": ["festive"],
+    "ingredients": [
+      {"item": "urad dal", "qty": 50, "unit": "g"},
+      {"item": "curd", "qty": 100, "unit": "g"},
+      {"item": "tamarind chutney", "qty": 15, "unit": "g"},
+      {"item": "cumin powder (roasted)", "qty": 0.25, "unit": "tsp"}
+    ]
+  },
+  {
+    "id": "khichdi", "name": "Khichdi", "region": "pan-india", "cuisine_style": "pan-india",
+    "meal_types": ["lunch", "dinner"], "diet": "veg", "spice_level": "mild", "prep_time_min": 30,
+    "tags": ["comfort-food", "light", "fasting-friendly", "kid-friendly"],
+    "ingredients": [
+      {"item": "rice", "qty": 40, "unit": "g"},
+      {"item": "split moong dal", "qty": 30, "unit": "g"},
+      {"item": "turmeric", "qty": 0.25, "unit": "tsp"},
+      {"item": "ghee", "qty": 8, "unit": "g"},
+      {"item": "cumin seeds", "qty": 0.5, "unit": "tsp"}
+    ]
+  }
+]
