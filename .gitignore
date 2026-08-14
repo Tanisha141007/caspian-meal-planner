@@ -3,3 +3,10 @@ __pycache__/
 *.pyc
 .env
 *.db
+
+# Raw Kaggle CSV: redistributes full copyrighted recipe instructions text
+# scraped from a third-party site: don't ship that, even privately - it's
+# a one-time manual download (see README), not something ingest reruns need
+# fetched automatically. app/data/recipes_ingested.json (the derived output:
+# names/ingredients/tags, no instructions) IS tracked.
+app/data/raw/

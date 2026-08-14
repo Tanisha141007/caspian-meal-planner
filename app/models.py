@@ -60,9 +60,34 @@ class Recipe(Base):
     diet = Column(String, default="veg")  # veg | non-veg | egg
     spice_level = Column(String, default="medium")
     prep_time_min = Column(Integer, default=30)
+    # protein-heavy | carb-heavy | vegetable-based | mixed - used by the planner
+    # to avoid the same category landing in back-to-back meal slots.
+    main_ingredient_category = Column(String, default="mixed")
+    # summer | monsoon | winter | all-season - split out from `tags` so the
+    # planner can filter on it directly instead of string-matching a free list.
+    season_tags = Column(JSON, default=list)
     tags = Column(JSON, default=list)  # ["jain-friendly", "fasting-friendly", "kid-friendly"]
-    # Ingredients scaled to 1 serving: [{"item": "poha", "qty": 60, "unit": "g"}, ...]
+    # Ingredients scaled to 1 serving: [{"item": "poha", "qty": 60, "unit": "g"}, ...].
+    # unit is one of: g, ml, pc, cup, tbsp, tsp - spices/liquids/grains normalize
+    # to volume units (cup/tbsp/tsp), whole items ("1 onion") stay pc, a few
+    # things that don't map sensibly to a kitchen measure (e.g. paneer by weight)
+    # stay g/ml. See app/messaging/formatter.py for how these render in messages.
     ingredients = Column(JSON, default=list)
+
+
+class RegionCuisineMap(Base):
+    """Maps an Indian state/UT to the cuisines locally popular there, so a
+    household's location can bias recipe suggestions even when their explicit
+    preferences don't mention a cuisine. Hand-authored (this is well-known
+    domestic knowledge, not something that needs an external dataset) -
+    weight is relative preference strength within the state, highest first."""
+
+    __tablename__ = "region_cuisine_map"
+
+    id = Column(Integer, primary_key=True)
+    state = Column(String, nullable=False, index=True)  # e.g. "Kerala", "Punjab"
+    cuisine_style = Column(String, nullable=False)  # matches Recipe.cuisine_style
+    weight = Column(Float, default=1.0)  # higher = more strongly associated with the state
 
 
 class MealPlan(Base):

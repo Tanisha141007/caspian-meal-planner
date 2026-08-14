@@ -68,6 +68,36 @@ Caspian CommClient (app/messaging/handler.py)
 - **MealPlan / MealPlanItem** - a week (or four weeks, for "monthly") of
   `date x meal_slot -> [recipe_ids]`, e.g. lunch = dal + rice + roti.
 - **Feedback** - every inbound cook reply plus Claude's read on what it meant.
+- **RegionCuisineMap** - state/UT -> locally popular `cuisine_style` weights
+  (`app/data/region_cuisine_seed.json`), hand-authored. Not wired into the
+  planner yet - lands with Phase 3's region-popularity weighting.
+
+## Recipe dataset
+
+The recipe universe is seeded two ways:
+
+- **Fixture** (default, `scripts/seed_db.py`): 36 hand-curated recipes in
+  `app/data/recipes_seed.json` - fast, guaranteed-clean, used for local dev/tests.
+- **Ingested** (`scripts/seed_db.py --ingested`): 4,262 recipes parsed from the
+  [6000+ Indian Food Recipes Dataset](https://www.kaggle.com/datasets/kanishk307/6000-indian-food-recipes-dataset)
+  (Kaggle). To regenerate:
+  1. Download the dataset from Kaggle (needs a Kaggle account) and drop the
+     CSV at `app/data/raw/indian_food_dataset.csv` (gitignored - it carries
+     copyrighted recipe instructions text, not something to redistribute
+     even privately; a one-time manual step, not fetched automatically).
+  2. `python scripts/ingest_recipes.py` - parses it into
+     `app/data/recipes_ingested.json` (tracked in git: structured facts only
+     - names, ingredients, tags - no instructions text) and prints a
+     row-count/parse-failure report.
+  3. `python scripts/seed_db.py --ingested` to load it into the DB.
+
+  Known limitations of the parsing (heuristic, not exact - see
+  `app/data/ingest.py`): ~2,080 non-Indian-cuisine rows and ~529
+  never-translated-to-English rows are dropped entirely; ingredient units
+  are approximated into a `g/ml/pc/cup/tbsp/tsp` vocabulary (e.g. "1 clove"
+  becomes `1 pc`, losing the "clove" specificity); a line with no explicit
+  quantity is marked `"to taste"` rather than guessing a number; `season_tags`
+  default to `all-season` (the source data carries no season signal).
 
 ## Setup
 
@@ -75,6 +105,7 @@ Caspian CommClient (app/messaging/handler.py)
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # fill in CASPIAN_API_KEY, ANTHROPIC_API_KEY, Twilio creds
+alembic upgrade head    # creates/updates the schema for whatever DATABASE_URL points at
 ```
 
 Get `CASPIAN_API_KEY` from [dashboard.trycaspianai.com](https://dashboard.trycaspianai.com)
@@ -83,6 +114,12 @@ For SMS you need your own Twilio number + Account SID + Auth Token
 (console.twilio.com), and its inbound webhook pointed at Caspian per
 [the SMS docs](https://www.trycaspianai.com/docs/) (`connect_phone` prints
 the exact webhook URL to set).
+
+Schema changes go through Alembic (`alembic revision --autogenerate -m "..."`,
+then `alembic upgrade head`) rather than editing the DB directly - this is
+what lets a populated Postgres DB pick up model changes safely. `init_db()`
+(plain `Base.metadata.create_all`) still exists for quick local scripts/tests
+that just need *a* working SQLite file, not a real migration history.
 
 ## Running it
 

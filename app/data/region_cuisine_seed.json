@@ -1,0 +1,139 @@
+{
+  "_comment": "State/UT -> locally popular cuisine_style slugs, highest weight = most native. cuisine_style values match what scripts/ingest_recipes.py assigns from the Kaggle Cuisine column (see CUISINE_MAP in app/data/ingest.py). Hand-authored domestic knowledge, not derived from a dataset - explicit household preferences override this weighting in the planner (Phase 3).",
+  "Andhra Pradesh": [
+    {"cuisine_style": "andhra", "weight": 3.0},
+    {"cuisine_style": "hyderabadi", "weight": 1.5},
+    {"cuisine_style": "south-indian", "weight": 1.0}
+  ],
+  "Arunachal Pradesh": [
+    {"cuisine_style": "northeast", "weight": 3.0},
+    {"cuisine_style": "pan-india", "weight": 1.0}
+  ],
+  "Assam": [
+    {"cuisine_style": "assamese", "weight": 3.0},
+    {"cuisine_style": "northeast", "weight": 2.0}
+  ],
+  "Bihar": [
+    {"cuisine_style": "bihari", "weight": 3.0},
+    {"cuisine_style": "north-indian", "weight": 1.5}
+  ],
+  "Chhattisgarh": [
+    {"cuisine_style": "north-indian", "weight": 2.0},
+    {"cuisine_style": "pan-india", "weight": 1.5}
+  ],
+  "Goa": [
+    {"cuisine_style": "goan", "weight": 3.0},
+    {"cuisine_style": "konkani", "weight": 1.5}
+  ],
+  "Gujarat": [
+    {"cuisine_style": "gujarati", "weight": 3.0},
+    {"cuisine_style": "sindhi", "weight": 1.0},
+    {"cuisine_style": "parsi", "weight": 1.0}
+  ],
+  "Haryana": [
+    {"cuisine_style": "punjabi", "weight": 2.5},
+    {"cuisine_style": "north-indian", "weight": 2.0}
+  ],
+  "Himachal Pradesh": [
+    {"cuisine_style": "himachali", "weight": 3.0},
+    {"cuisine_style": "north-indian", "weight": 1.5}
+  ],
+  "Jharkhand": [
+    {"cuisine_style": "bihari", "weight": 2.5},
+    {"cuisine_style": "north-indian", "weight": 1.0}
+  ],
+  "Karnataka": [
+    {"cuisine_style": "karnataka", "weight": 3.0},
+    {"cuisine_style": "mangalorean", "weight": 1.5},
+    {"cuisine_style": "konkani", "weight": 1.0}
+  ],
+  "Kerala": [
+    {"cuisine_style": "kerala", "weight": 3.0},
+    {"cuisine_style": "mangalorean", "weight": 1.0}
+  ],
+  "Madhya Pradesh": [
+    {"cuisine_style": "north-indian", "weight": 2.0},
+    {"cuisine_style": "rajasthani", "weight": 1.0},
+    {"cuisine_style": "pan-india", "weight": 1.5}
+  ],
+  "Maharashtra": [
+    {"cuisine_style": "maharashtrian", "weight": 3.0},
+    {"cuisine_style": "konkani", "weight": 1.5},
+    {"cuisine_style": "parsi", "weight": 1.0},
+    {"cuisine_style": "goan", "weight": 1.0}
+  ],
+  "Manipur": [
+    {"cuisine_style": "northeast", "weight": 3.0}
+  ],
+  "Meghalaya": [
+    {"cuisine_style": "northeast", "weight": 3.0}
+  ],
+  "Mizoram": [
+    {"cuisine_style": "northeast", "weight": 3.0}
+  ],
+  "Nagaland": [
+    {"cuisine_style": "northeast", "weight": 3.0}
+  ],
+  "Odisha": [
+    {"cuisine_style": "odia", "weight": 3.0},
+    {"cuisine_style": "bengali", "weight": 1.0}
+  ],
+  "Punjab": [
+    {"cuisine_style": "punjabi", "weight": 3.0},
+    {"cuisine_style": "north-indian", "weight": 1.0}
+  ],
+  "Rajasthan": [
+    {"cuisine_style": "rajasthani", "weight": 3.0},
+    {"cuisine_style": "north-indian", "weight": 1.0},
+    {"cuisine_style": "sindhi", "weight": 1.0}
+  ],
+  "Sikkim": [
+    {"cuisine_style": "northeast", "weight": 3.0}
+  ],
+  "Tamil Nadu": [
+    {"cuisine_style": "tamil", "weight": 3.0},
+    {"cuisine_style": "chettinad", "weight": 2.0},
+    {"cuisine_style": "south-indian", "weight": 1.0}
+  ],
+  "Telangana": [
+    {"cuisine_style": "hyderabadi", "weight": 3.0},
+    {"cuisine_style": "andhra", "weight": 2.0}
+  ],
+  "Tripura": [
+    {"cuisine_style": "northeast", "weight": 3.0},
+    {"cuisine_style": "bengali", "weight": 1.0}
+  ],
+  "Uttar Pradesh": [
+    {"cuisine_style": "awadhi", "weight": 3.0},
+    {"cuisine_style": "mughlai", "weight": 2.0},
+    {"cuisine_style": "north-indian", "weight": 1.5}
+  ],
+  "Uttarakhand": [
+    {"cuisine_style": "north-indian", "weight": 2.0},
+    {"cuisine_style": "himachali", "weight": 1.0}
+  ],
+  "West Bengal": [
+    {"cuisine_style": "bengali", "weight": 3.0},
+    {"cuisine_style": "odia", "weight": 1.0}
+  ],
+  "Delhi": [
+    {"cuisine_style": "mughlai", "weight": 2.5},
+    {"cuisine_style": "punjabi", "weight": 2.5},
+    {"cuisine_style": "north-indian", "weight": 2.0}
+  ],
+  "Jammu and Kashmir": [
+    {"cuisine_style": "kashmiri", "weight": 3.0},
+    {"cuisine_style": "mughlai", "weight": 1.0}
+  ],
+  "Ladakh": [
+    {"cuisine_style": "kashmiri", "weight": 1.5},
+    {"cuisine_style": "northeast", "weight": 1.0}
+  ],
+  "Chandigarh": [
+    {"cuisine_style": "punjabi", "weight": 3.0}
+  ],
+  "Puducherry": [
+    {"cuisine_style": "tamil", "weight": 2.5},
+    {"cuisine_style": "south-indian", "weight": 1.5}
+  ]
+}
