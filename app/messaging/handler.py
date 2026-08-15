@@ -1,8 +1,10 @@
 """Caspian wiring: one on_message handler for every connected channel, plus
-the outbound send used by the daily scheduler job. This is the ONLY file
-that should need to change when WhatsApp goes live on Caspian - swap
-connect_phone(provider="twilio", ...) for connect_whatsapp(...) in
-connect_channel() below; the handler and formatter are channel-agnostic."""
+the outbound send used by the daily scheduler job.
+
+Cook notifications currently use Caspian's live phone/SMS channel with the
+developer's own Twilio number. WhatsApp exists in parts of the SDK, but it is
+not exposed by the live gateway yet, so the app must not try to connect it.
+The handler and formatter stay channel-agnostic for when that changes."""
 
 import datetime as dt
 import os
@@ -30,23 +32,27 @@ def connect_channel():
     """The one line that names the channel - everything else (handler,
     formatter, scheduler) is channel-agnostic.
 
-    CASPIAN_CHANNEL=sms (default): bring-your-own Twilio number. Confirmed
-    working against Caspian's public docs.
+    CASPIAN_CHANNEL=sms (default): bring-your-own Twilio number via Caspian's
+    live phone channel.
 
-    CASPIAN_CHANNEL=whatsapp: the installed caspian-sdk already exposes
-    connect_whatsapp() / start_whatsapp_onboarding(), which POSTs to a real
-    /v1/connections/whatsapp/onboarding-session endpoint and is billed like
-    the other paid channels (X, iMessage) - even though the public docs
-    site still lists WhatsApp as "coming soon". It may or may not be
-    enabled for your account yet; this path is here so trying it is a
-    one-env-var change, not a code change. See scripts/start_whatsapp_onboarding.py.
+    CASPIAN_CHANNEL=whatsapp: coming soon on the hosted gateway. Caspian's
+    integration guide says not to attempt non-live channels, even when SDK
+    methods exist locally.
     """
     global _phone_connection
     channel = os.environ.get("CASPIAN_CHANNEL", "sms").lower()
 
     if channel == "whatsapp":
-        _phone_connection = get_client().connect_whatsapp()
-        return _phone_connection
+        raise RuntimeError(
+            "WhatsApp is not currently returned by Caspian /v1/channels. "
+            "Use CASPIAN_CHANNEL=sms for now and switch once WhatsApp is live."
+        )
+
+    if channel not in {"sms", "phone"}:
+        raise RuntimeError(
+            f"Unsupported CASPIAN_CHANNEL={channel!r}. This app currently sends "
+            "cook notifications through Caspian's phone/SMS channel."
+        )
 
     _phone_connection = get_client().connect_phone(
         provider="twilio",

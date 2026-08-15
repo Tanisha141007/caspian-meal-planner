@@ -10,23 +10,25 @@ cook's replies.
 [Caspian](https://www.trycaspianai.com/docs/) is a messaging **transport**
 layer, not a planning or knowledge engine: one `on_message` handler, one
 `message.reply()` / `send_message()` / `initiate()`, routed to whichever
-channel (SMS, WhatsApp, Telegram, Slack, email, ...) the message came from.
+live channel the message came from.
 It has no concept of recipes, diets, or meal plans. All of that - the
 recipe universe, the household's diet profile, the weekly/monthly
 generation, and the text that goes out - is this app; Caspian only carries
 the final message to the cook's phone and carries their reply back.
 
-**Channel status:** Caspian's docs list WhatsApp as "coming soon" (SMS,
-Telegram, Slack, Discord, email are live and free; X and iMessage are paid).
-The installed `caspian-sdk` package already ships `connect_whatsapp()` and a
-hosted `start_whatsapp_onboarding()` flow that hits a real API endpoint and
-is billed like the other paid channels - so it may already work for some
-accounts even though the docs site hasn't caught up. This project defaults
-to **SMS via your own Twilio number** (confirmed working) and treats
-WhatsApp as a one-env-var swap (`CASPIAN_CHANNEL=whatsapp`) once you've
-confirmed it's live on your account - see
-[scripts/start_whatsapp_onboarding.py](scripts/start_whatsapp_onboarding.py).
-The handler, formatter, and scheduler never change either way.
+**Channel status:** Always check Caspian's live channel endpoint before
+connecting a channel:
+
+```bash
+curl -s https://api.trycaspianai.com/v1/channels \
+  -H "Authorization: Bearer $CASPIAN_API_KEY"
+```
+
+As of this build, the hosted gateway lists email, Discord, Slack, X, Telegram,
+phone/SMS through Twilio or Telnyx, Bluesky, GMeet, Zulip, and Linear.
+WhatsApp is not live on this gateway yet, even though SDK methods may exist
+locally, so this project must not try to connect it. The app defaults to
+**SMS via your own Twilio number** for cook notifications.
 
 ## Architecture
 
@@ -81,8 +83,8 @@ Get `CASPIAN_API_KEY` from [dashboard.trycaspianai.com](https://dashboard.trycas
 and `ANTHROPIC_API_KEY` from [console.anthropic.com](https://console.anthropic.com).
 For SMS you need your own Twilio number + Account SID + Auth Token
 (console.twilio.com), and its inbound webhook pointed at Caspian per
-[the SMS docs](https://www.trycaspianai.com/docs/) (`connect_phone` prints
-the exact webhook URL to set).
+[the SMS docs](https://www.trycaspianai.com/docs/) (`connect_phone` returns
+the phone connection used by outbound sends).
 
 ## Running it
 
