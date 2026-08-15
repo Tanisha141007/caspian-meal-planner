@@ -23,6 +23,22 @@ TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./caspian_meals.db")
 APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")
 
+# Comma-separated origins app/api/main.py's CORS middleware allows - the
+# deployed mealtime-harmony frontend (Cloudflare) plus local dev ports.
+CORS_ORIGINS = [
+    o.strip()
+    for o in os.environ.get(
+        "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8787"
+    ).split(",")
+    if o.strip()
+]
+
+# Supabase project (M3: auth). Empty until configured - app/api/deps.py's
+# auth dependency refuses all requests until SUPABASE_JWT_SECRET is set,
+# rather than silently running open.
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
+
 
 def llm_configured() -> bool:
     """True once whichever provider LLM_PROVIDER points at has a key set."""

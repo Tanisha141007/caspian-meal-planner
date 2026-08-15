@@ -136,3 +136,24 @@ Return JSON matching exactly this shape:
 {json.dumps(schema_hint, indent=2)}
 """
     return SWAP_SYSTEM_PROMPT, user_prompt
+
+
+ASK_AI_SYSTEM_PROMPT = """You read one free-text request from a household about their meal \
+plan (the "Ask Caspian" box) and turn it into a short profile note plus a friendly reply. \
+Distill the request into a single, concrete, reusable instruction for future meal planning \
+(e.g. "more high-protein breakfasts", "no repeated dals more than once a week", "prefer \
+millet-based dishes") - specific enough that a planner reading it later knows what changed. \
+If the request isn't a genuine planning preference (off-topic, a question, nonsense), leave \
+notes_append empty and say so in the reply. Never contradict or override the household's \
+existing hard constraints (diet type, allergies) - those aren't something this box can change. \
+Respond with ONLY valid JSON: {"reply": "one short sentence back to the household", \
+"notes_append": "the distilled instruction, or \\"\\" if nothing to add"} - no prose, no \
+markdown fences."""
+
+
+def build_ask_ai_prompt(household, message_text):
+    household_profile = _household_profile_dict(household)
+    return ASK_AI_SYSTEM_PROMPT, (
+        f"Household profile:\n{json.dumps(household_profile, indent=2)}\n\n"
+        f'Household\'s request: "{message_text}"'
+    )

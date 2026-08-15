@@ -5,7 +5,7 @@ from collections import defaultdict
 from app.config import MEAL_SLOTS
 from app.db import get_session
 from app.meal_planner.llm_client import generate_json
-from app.meal_planner.prompts import build_feedback_prompt, build_plan_prompt, build_swap_prompt
+from app.meal_planner.prompts import build_ask_ai_prompt, build_feedback_prompt, build_plan_prompt, build_swap_prompt
 from app.models import Household, MealPlan, MealPlanItem, Recipe, RegionCuisineMap
 
 # A household can list a category term ("dairy") as an allergy/dislike, not
@@ -151,6 +151,21 @@ def generate_weekly_plan(household_id: int, week_start: dt.date) -> int:
         recent_ids = recent_recipe_ids(session, household_id, week_start - dt.timedelta(days=14))
         plan_json = _call_llm_for_plan(household, narrowed, recent_ids, week_start, 7)
 
+        # Regenerating the same week (the frontend's "Regenerate" action)
+        # would otherwise leave two MealPlan rows both claiming these dates -
+        # anything reading by date range (not by meal_plan_id) would then see
+        # duplicates. Supersede rather than delete: history stays queryable.
+        (
+            session.query(MealPlan)
+            .filter(
+                MealPlan.household_id == household_id,
+                MealPlan.period_type == "week",
+                MealPlan.period_start == week_start,
+                MealPlan.status == "active",
+            )
+            .update({"status": "superseded"})
+        )
+
         plan = MealPlan(household_id=household_id, period_type="week", period_start=week_start, status="active")
         session.add(plan)
         session.flush()
@@ -278,3 +293,28 @@ def interpret_cook_reply(message_text: str, todays_recipe_ids: list) -> dict:
     feedback: dislike, swap request, ingredient issue, confirmation, etc."""
     system, user = build_feedback_prompt(message_text, todays_recipe_ids)
     return generate_json(system, user, max_tokens=300)
+
+
+def ask_ai(household_id: int, message_text: str) -> dict:
+    """The "Ask Caspian" free-text box: distills the request into a short
+    instruction appended to household.notes (which every generation call
+    already reads as free_text_notes), rather than just storing raw text -
+    this is what makes it actually "fold into the profile" per the brief."""
+    session = get_session()
+    try:
+        household = session.get(Household, household_id)
+        if household is None:
+            raise ValueError(f"No household with id {household_id}")
+
+        system, user = build_ask_ai_prompt(household, message_text)
+        result = generate_json(system, user, max_tokens=300)
+
+        addition = (result.get("notes_append") or "").strip()
+        if addition:
+            household.notes = f"{household.notes}\n- {addition}".strip() if household.notes else f"- {addition}"
+            session.commit()
+            session.refresh(household)
+
+        return {"reply": result.get("reply", ""), "notes_append": addition, "notes": household.notes}
+    finally:
+        session.close()

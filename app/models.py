@@ -24,10 +24,20 @@ class Household(Base):
     __tablename__ = "households"
 
     id = Column(Integer, primary_key=True)
+    # Supabase auth user id (JWT "sub" claim). Nullable for households
+    # created before auth existed (CLI scripts, the old Jinja demo); every
+    # household created through app/api/ sets it and every app/api/ route
+    # scopes its queries by it - see app/api/deps.py::get_current_user_id.
+    owner_user_id = Column(String, nullable=True, unique=True, index=True)
     name = Column(String, nullable=False)
     cook_name = Column(String, nullable=False)
     cook_phone = Column(String, nullable=False, unique=True)  # E.164, e.g. +9198XXXXXXXX
     send_time = Column(String, default="07:00")  # HH:MM local time for the daily message
+    # Stored per household for the Preferences UI, but a Caspian connection
+    # is one channel for the whole deployment today (CASPIAN_CHANNEL in
+    # app/config.py) - per-household channel routing isn't wired up yet.
+    preferred_channel = Column(String, default="sms")  # "sms" | "whatsapp"
+    lead_hours = Column(Integer, default=12)  # hours before a meal to notify the cook (display/storage only for now)
 
     city = Column(String, default="")  # free text, display only
     # Indian state/UT, must match RegionCuisineMap.state - powers regional
