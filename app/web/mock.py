@@ -1,4 +1,4 @@
-"""Rule-based fallbacks for the web preview when ANTHROPIC_API_KEY isn't
+"""Rule-based fallbacks for the web preview when no LLM provider key is
 set, so the family/cook dashboards work with zero external keys. Still
 diet/allergy-safe: it reuses candidate_recipes() for filtering. Swapped
 out automatically for the real Claude generator in app/web/main.py the

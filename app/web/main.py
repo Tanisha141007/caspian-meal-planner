@@ -3,7 +3,7 @@ chart + monthly shopping list) and a cook dashboard (today's meals with
 ingredients/portions + a feedback box that simulates a WhatsApp/SMS reply
 round-trip, without needing Caspian/Twilio credentials).
 
-Uses the real Claude-backed generator when ANTHROPIC_API_KEY is set,
+Uses the real LLM-backed generator when an LLM provider key is configured,
 otherwise falls back to app/web/mock.py so the whole flow is clickable with
 zero external keys.
 
@@ -17,7 +17,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.config import ANTHROPIC_API_KEY, MEAL_SLOTS
+from app.config import MEAL_SLOTS, llm_configured
 from app.db import get_session, init_db
 from app.meal_planner import generator as claude_generator
 from app.messaging.formatter import aggregate_ingredients, dish_names, format_daily_message
@@ -30,7 +30,7 @@ app = FastAPI(title="Caspian Meal Planner - Preview")
 templates = Jinja2Templates(directory="app/web/templates")
 app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 
-LIVE_MODE = bool(ANTHROPIC_API_KEY)
+LIVE_MODE = llm_configured()
 
 
 def _this_monday(today=None) -> dt.date:

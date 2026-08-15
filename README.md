@@ -104,12 +104,15 @@ The recipe universe is seeded two ways:
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in CASPIAN_API_KEY, ANTHROPIC_API_KEY, Twilio creds
+cp .env.example .env   # fill in CASPIAN_API_KEY, GEMINI_API_KEY, Twilio creds
 alembic upgrade head    # creates/updates the schema for whatever DATABASE_URL points at
 ```
 
 Get `CASPIAN_API_KEY` from [dashboard.trycaspianai.com](https://dashboard.trycaspianai.com)
-and `ANTHROPIC_API_KEY` from [console.anthropic.com](https://console.anthropic.com).
+and `GEMINI_API_KEY` from [aistudio.google.com](https://aistudio.google.com)
+(Google AI Studio - free tier, no card needed; set `LLM_PROVIDER=anthropic`
++ `ANTHROPIC_API_KEY` instead if you'd rather use Claude - see
+`app/meal_planner/llm_client.py`).
 For SMS you need your own Twilio number + Account SID + Auth Token
 (console.twilio.com), and its inbound webhook pointed at Caspian per
 [the SMS docs](https://www.trycaspianai.com/docs/) (`connect_phone` prints

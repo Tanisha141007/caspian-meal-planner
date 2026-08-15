@@ -1,32 +1,35 @@
 import datetime as dt
-import json
+import random
 from collections import defaultdict
 
-from anthropic import Anthropic
-
-from app.config import ANTHROPIC_API_KEY, CLAUDE_MODEL, MEAL_SLOTS
+from app.config import MEAL_SLOTS
 from app.db import get_session
-from app.meal_planner.prompts import build_feedback_prompt, build_plan_prompt
-from app.models import Household, MealPlan, MealPlanItem, Recipe
+from app.meal_planner.llm_client import generate_json
+from app.meal_planner.prompts import build_feedback_prompt, build_plan_prompt, build_swap_prompt
+from app.models import Household, MealPlan, MealPlanItem, Recipe, RegionCuisineMap
 
-_client = None
+# A household can list a category term ("dairy") as an allergy/dislike, not
+# just a literal ingredient name - expand it to what actually shows up in
+# ingredient text before substring-matching. Diet-safety gap found during
+# Phase 1 verification: a "dairy" entry alone caught 0% of dairy-containing
+# recipes since no ingredient is literally named "dairy".
+ALLERGY_CATEGORY_EXPANSIONS = {
+    "dairy": ["milk", "ghee", "paneer", "curd", "yogurt", "yoghurt", "cream", "butter", "cheese", "khoya", "malai"],
+    "nuts": ["peanut", "cashew", "almond", "walnut", "pistachio", "hazelnut", "pecan"],
+    "tree nuts": ["cashew", "almond", "walnut", "pistachio", "hazelnut", "pecan"],
+    "gluten": ["wheat", "maida", "atta", "semolina", "rava", "sooji", "barley", "flour"],
+    "shellfish": ["prawn", "shrimp", "crab", "lobster", "oyster", "clam", "mussel"],
+    "seafood": ["fish", "prawn", "shrimp", "crab", "lobster", "oyster", "clam", "mussel", "squid"],
+    "soy": ["soya", "soy", "tofu"],
+    "sesame": ["sesame", "til"],
+}
 
-
-def _anthropic():
-    global _client
-    if _client is None:
-        _client = Anthropic(api_key=ANTHROPIC_API_KEY)
-    return _client
-
-
-def _parse_json(text: str) -> dict:
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.strip("`")
-        text = text.split("\n", 1)[1] if "\n" in text else text
-        if text.lower().startswith("json"):
-            text = text.split("\n", 1)[1]
-    return json.loads(text)
+# Baseline weight for cuisines with no explicit signal, so narrowing still
+# leaves enough variety to fill a week rather than only ever offering the
+# household's top 1-2 preferred cuisines. "pan-india" recipes (generically
+# popular, not region-specific) get a solid default since they suit anyone.
+_DEFAULT_CUISINE_WEIGHT = 0.5
+_PAN_INDIA_WEIGHT = 1.5
 
 
 def _diet_allowlist(diet_type: str) -> set:
@@ -39,13 +42,24 @@ def _diet_allowlist(diet_type: str) -> set:
     }.get(diet_type, {"veg", "vegan"})
 
 
+def _expand_banned_terms(terms: list) -> set:
+    expanded = set()
+    for term in terms:
+        term = term.lower().strip()
+        if not term:
+            continue
+        expanded.add(term)
+        expanded.update(ALLERGY_CATEGORY_EXPANSIONS.get(term, []))
+    return expanded
+
+
 def candidate_recipes(session, household: Household):
     """Recipes matching the household's hard constraints: diet type, no
-    allergens, no disliked ingredients. This filtered set is what gets
-    handed to Claude as context - the recipe universe never leaves the DB
-    wholesale."""
+    allergens, no disliked ingredients. This filtered set - not the full
+    recipe table - is what narrow_candidates() then ranks and caps before
+    anything reaches the LLM."""
     allowed_diets = _diet_allowlist(household.diet_type)
-    banned = {i.lower() for i in (household.allergies or []) + (household.disliked_ingredients or [])}
+    banned = _expand_banned_terms((household.allergies or []) + (household.disliked_ingredients or []))
 
     candidates = []
     for r in session.query(Recipe).all():
@@ -56,6 +70,53 @@ def candidate_recipes(session, household: Household):
             continue
         candidates.append(r)
     return candidates
+
+
+def cuisine_weights(session, household: Household) -> dict:
+    """cuisine_style -> weight. Explicit preferred_cuisines is the strongest
+    signal (the plan's requirement: explicit preference overrides the
+    regional default); falls back to RegionCuisineMap for the household's
+    state when they haven't named any cuisines."""
+    if household.preferred_cuisines:
+        return {c.lower(): 3.0 for c in household.preferred_cuisines}
+    if household.state:
+        rows = session.query(RegionCuisineMap).filter(RegionCuisineMap.state == household.state).all()
+        if rows:
+            return {r.cuisine_style: r.weight for r in rows}
+    return {}
+
+
+def narrow_candidates(candidates: list, weights: dict, meal_slots: list, per_slot_cap: int = 60, hard_cap: int = 250):
+    """Bounds what gets sent to the LLM regardless of how large the recipe
+    table is (unbounded, this was ~224K tokens against the full ingested
+    dataset - unusable). Ranks by cuisine weight within each meal slot so
+    the cap favors the household's region/preferences rather than an
+    arbitrary slice, then takes the union across slots so every slot still
+    has options."""
+
+    def weight_of(recipe):
+        w = weights.get(recipe.cuisine_style, _DEFAULT_CUISINE_WEIGHT)
+        if recipe.cuisine_style == "pan-india":
+            w = max(w, _PAN_INDIA_WEIGHT)
+        return w
+
+    ranked = sorted(candidates, key=weight_of, reverse=True)
+    selected = {}
+    for slot in meal_slots:
+        count = 0
+        for recipe in ranked:
+            if slot not in (recipe.meal_types or []):
+                continue
+            selected.setdefault(recipe.id, recipe)
+            count += 1
+            if count >= per_slot_cap:
+                break
+
+    result = list(selected.values())
+    if len(result) > hard_cap:
+        result = sorted(result, key=weight_of, reverse=True)[:hard_cap]
+    random.shuffle(result)  # so the LLM doesn't see the same ordering (== same picks) every call
+    return result
 
 
 def recent_recipe_ids(session, household_id: int, since: dt.date):
@@ -70,15 +131,9 @@ def recent_recipe_ids(session, household_id: int, since: dt.date):
     return ids
 
 
-def _call_claude_for_plan(household, candidates, recent_ids, start_date, num_days):
+def _call_llm_for_plan(household, candidates, recent_ids, start_date, num_days):
     system, user = build_plan_prompt(household, candidates, recent_ids, start_date, num_days, MEAL_SLOTS)
-    response = _anthropic().messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4000,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    return _parse_json(response.content[0].text)
+    return generate_json(system, user, max_tokens=4000)
 
 
 def generate_weekly_plan(household_id: int, week_start: dt.date) -> int:
@@ -91,8 +146,10 @@ def generate_weekly_plan(household_id: int, week_start: dt.date) -> int:
             raise ValueError(f"No household with id {household_id}")
 
         candidates = candidate_recipes(session, household)
+        weights = cuisine_weights(session, household)
+        narrowed = narrow_candidates(candidates, weights, MEAL_SLOTS)
         recent_ids = recent_recipe_ids(session, household_id, week_start - dt.timedelta(days=14))
-        plan_json = _call_claude_for_plan(household, candidates, recent_ids, week_start, 7)
+        plan_json = _call_llm_for_plan(household, narrowed, recent_ids, week_start, 7)
 
         plan = MealPlan(household_id=household_id, period_type="week", period_start=week_start, status="active")
         session.add(plan)
@@ -114,6 +171,60 @@ def generate_weekly_plan(household_id: int, week_start: dt.date) -> int:
                 )
         session.commit()
         return plan.id
+    finally:
+        session.close()
+
+
+def regenerate_single_meal(household_id: int, date: dt.date, slot: str, hint: str = "") -> MealPlanItem:
+    """Swaps one meal slot on one day without touching the rest of the
+    week's plan - the frontend's per-meal swap button. `hint` is an
+    optional free-text nudge for this swap specifically (e.g. "something
+    lighter today")."""
+    session = get_session()
+    try:
+        household = session.get(Household, household_id)
+        if household is None:
+            raise ValueError(f"No household with id {household_id}")
+
+        item = (
+            session.query(MealPlanItem)
+            .filter(
+                MealPlanItem.household_id == household_id,
+                MealPlanItem.date == date,
+                MealPlanItem.meal_slot == slot,
+            )
+            .first()
+        )
+        if item is None:
+            raise ValueError(f"No planned meal for household {household_id} on {date} ({slot})")
+
+        # Exclude whatever else this week already uses (no duplicate dish in
+        # one week) plus the usual 14-day lookback; fall back to just the
+        # lookback if that leaves nothing for this slot to pick from.
+        same_week_ids = {
+            rid
+            for other in session.query(MealPlanItem).filter(MealPlanItem.meal_plan_id == item.meal_plan_id).all()
+            for rid in (other.dish_recipe_ids or [])
+        }
+        recent_ids = set(recent_recipe_ids(session, household_id, date - dt.timedelta(days=14)))
+
+        candidates = candidate_recipes(session, household)
+        weights = cuisine_weights(session, household)
+
+        pool = [c for c in candidates if c.id not in (same_week_ids | recent_ids)]
+        if not any(slot in (r.meal_types or []) for r in pool):
+            pool = [c for c in candidates if c.id not in recent_ids]
+
+        narrowed = narrow_candidates(pool, weights, [slot], per_slot_cap=40)
+
+        system, user = build_swap_prompt(household, narrowed, slot, hint)
+        result = generate_json(system, user, max_tokens=300)
+
+        item.dish_recipe_ids = result["recipe_ids"]
+        item.note = result.get("note", item.note)
+        session.commit()
+        session.refresh(item)
+        return item
     finally:
         session.close()
 
@@ -166,10 +277,4 @@ def interpret_cook_reply(message_text: str, todays_recipe_ids: list) -> dict:
     """Turns one inbound WhatsApp/SMS message from the cook into structured
     feedback: dislike, swap request, ingredient issue, confirmation, etc."""
     system, user = build_feedback_prompt(message_text, todays_recipe_ids)
-    response = _anthropic().messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=300,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    return _parse_json(response.content[0].text)
+    return generate_json(system, user, max_tokens=300)

@@ -19,8 +19,8 @@ Respond with ONLY valid JSON matching the schema you're given - no prose, no mar
 fences."""
 
 
-def build_plan_prompt(household, candidates, recent_ids, start_date, num_days, meal_slots):
-    household_profile = {
+def _household_profile_dict(household):
+    return {
         "family_size": household.family_size,
         "kids_count": household.kids_count,
         "diet_type": household.diet_type,
@@ -31,7 +31,9 @@ def build_plan_prompt(household, candidates, recent_ids, start_date, num_days, m
         "free_text_notes": household.notes or "",
     }
 
-    candidate_list = [
+
+def _candidate_list_json(candidates):
+    return [
         {
             "id": r.id,
             "name": r.name,
@@ -45,6 +47,10 @@ def build_plan_prompt(household, candidates, recent_ids, start_date, num_days, m
         for r in candidates
     ]
 
+
+def build_plan_prompt(household, candidates, recent_ids, start_date, num_days, meal_slots):
+    household_profile = _household_profile_dict(household)
+    candidate_list = _candidate_list_json(candidates)
     dates = [str(start_date + dt.timedelta(days=i)) for i in range(num_days)]
 
     schema_hint = {
@@ -97,3 +103,36 @@ def build_feedback_prompt(message_text, todays_recipe_ids):
         f"Today's planned recipe ids: {json.dumps(todays_recipe_ids)}\n\n"
         f'Cook\'s message: "{message_text}"'
     )
+
+
+SWAP_SYSTEM_PROMPT = """You are replacing ONE meal slot in an already-planned week for an \
+Indian household, without touching the rest of the week. Pick only from the candidate \
+recipes given - never invent a dish. Follow standard Indian meal structure (lunch/dinner = \
+one dal or curry + a rice or roti base, optionally a second sabzi; breakfast and snack are \
+a single dish). Respect diet type, allergies, dislikes and spice level exactly - hard \
+constraints, not preferences. Respond with ONLY valid JSON matching the schema you're \
+given - no prose, no markdown fences."""
+
+
+def build_swap_prompt(household, candidates, slot, hint=""):
+    household_profile = _household_profile_dict(household)
+    candidate_list = _candidate_list_json(candidates)
+    schema_hint = {"recipe_ids": ["<id from candidates>", "..."], "note": "short note or empty string"}
+
+    hint_line = f'\nExtra request from the household for this swap: "{hint}"\n' if hint else ""
+
+    user_prompt = f"""Household profile:
+{json.dumps(household_profile, indent=2)}
+
+Candidate recipes for the "{slot}" slot (pick recipe_ids ONLY from this list - all \
+of these are already excluded from repeating anything else in this week's plan):
+{json.dumps(candidate_list, indent=2)}
+{hint_line}
+Pick a replacement for this "{slot}" slot. For "lunch"/"dinner" use a combo of 2-3 \
+recipe_ids (one dal/curry + one rice or roti); for "breakfast"/"snack" use a single \
+recipe_id. Use "note" for anything the cook should know, "" if nothing to add.
+
+Return JSON matching exactly this shape:
+{json.dumps(schema_hint, indent=2)}
+"""
+    return SWAP_SYSTEM_PROMPT, user_prompt

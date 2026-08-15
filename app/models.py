@@ -29,6 +29,11 @@ class Household(Base):
     cook_phone = Column(String, nullable=False, unique=True)  # E.164, e.g. +9198XXXXXXXX
     send_time = Column(String, default="07:00")  # HH:MM local time for the daily message
 
+    city = Column(String, default="")  # free text, display only
+    # Indian state/UT, must match RegionCuisineMap.state - powers regional
+    # cuisine weighting in the planner when preferred_cuisines is empty.
+    state = Column(String, default="")
+
     diet_type = Column(String, default="veg")  # veg | non-veg | eggetarian | jain | vegan
     allergies = Column(JSON, default=list)  # ["peanut", "dairy"]
     disliked_ingredients = Column(JSON, default=list)  # ["bitter gourd"]

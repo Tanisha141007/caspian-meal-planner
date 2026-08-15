@@ -10,7 +10,7 @@
   <div class="topbar">
     <a class="brand" href="/">Caspian Meal Planner</a>
     <span class="badge {{ 'live' if live_mode else 'mock' }}">
-      {{ 'Claude live' if live_mode else 'Demo mode (no ANTHROPIC_API_KEY)' }}
+      {{ 'LLM live' if live_mode else 'Demo mode (no LLM key configured)' }}
     </span>
   </div>
   <div class="container{% block container_class %}{% endblock %}">
