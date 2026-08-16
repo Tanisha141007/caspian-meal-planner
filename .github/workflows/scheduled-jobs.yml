@@ -19,7 +19,7 @@ on:
     # fixed time - see app/scheduler/jobs.py).
     - cron: "*/15 * * * *"
     # Sunday 20:00 IST (Asia/Kolkata, UTC+5:30) = 14:30 UTC - generates next
-    # week's chart for every active household.
+    # week's chart for every active household and emails it to signed-in owners.
     - cron: "30 14 * * 0"
     # 1st of the month, 08:00 IST = 02:30 UTC - rolls up last month's
     # ingredients into one shopping list per household.
@@ -41,7 +41,7 @@ jobs:
           curl -sf -X POST "$API_BASE_URL/internal/daily-send" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
           echo
 
-      - name: Generate next week's plan
+      - name: Generate next week's plan + owner email
         if: github.event.schedule == '30 14 * * 0'
         run: curl -sf -X POST "$API_BASE_URL/internal/weekly-plan" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
 

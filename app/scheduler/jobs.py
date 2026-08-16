@@ -7,9 +7,10 @@ import datetime as dt
 import logging
 
 from app.db import get_session
-from app.meal_planner.generator import generate_weekly_plan, monthly_shopping_list
-from app.messaging.handler import get_client, send_daily_message
-from app.models import Household, MealPlanItem, Recipe
+from app.meal_planner.generator import candidate_recipes, cuisine_weights, generate_weekly_plan, monthly_shopping_list
+from app.messaging.formatter import format_weekly_owner_email
+from app.messaging.handler import get_client, send_daily_message, send_owner_email
+from app.models import Household, MealPlan, MealPlanItem, Recipe
 
 logger = logging.getLogger("scheduler")
 
@@ -21,7 +22,7 @@ def _next_monday(today=None) -> dt.date:
 
 
 def weekly_plan_job():
-    """Sunday 20:00: generates next week's chart for every active household."""
+    """Sunday 20:00: generates next week's chart and emails it to each signed-in owner."""
     session = get_session()
     try:
         households = session.query(Household).filter(Household.active.is_(True)).all()
@@ -33,8 +34,61 @@ def weekly_plan_job():
         try:
             plan_id = generate_weekly_plan(h.id, week_start)
             logger.info("Generated weekly plan %s for household %s (%s)", plan_id, h.id, h.name)
+            send_weekly_owner_email(h.id, plan_id, week_start)
         except Exception:
             logger.exception("Failed to generate weekly plan for household %s", h.id)
+
+
+def _discover_suggestions(session, household: Household, week_items: list, limit: int = 6) -> list[Recipe]:
+    planned_recipe_ids = {rid for item in week_items for rid in (item.dish_recipe_ids or [])}
+    weights = cuisine_weights(session, household)
+
+    def rank(recipe: Recipe):
+        cuisine_weight = weights.get(recipe.cuisine_style, 0.5)
+        slot_score = len(recipe.meal_types or [])
+        return (-cuisine_weight, -slot_score, recipe.prep_time_min, recipe.name)
+
+    pool = [recipe for recipe in candidate_recipes(session, household) if recipe.id not in planned_recipe_ids]
+    return sorted(pool, key=rank)[:limit]
+
+
+def send_weekly_owner_email(household_id: int, plan_id: int, week_start: dt.date) -> bool:
+    """Formats and sends the household-owner Sunday email through Caspian."""
+    session = get_session()
+    try:
+        household = session.get(Household, household_id)
+        if household is None:
+            logger.warning("No household %s for weekly owner email", household_id)
+            return False
+        if not household.owner_email:
+            logger.info("Skipping weekly owner email for household %s - no owner_email yet", household_id)
+            return False
+
+        plan = session.get(MealPlan, plan_id)
+        if plan is None:
+            logger.warning("No meal plan %s for household %s weekly owner email", plan_id, household_id)
+            return False
+
+        week_items = (
+            session.query(MealPlanItem)
+            .filter(MealPlanItem.meal_plan_id == plan.id)
+            .order_by(MealPlanItem.date, MealPlanItem.meal_slot)
+            .all()
+        )
+        recipe_ids = {rid for item in week_items for rid in (item.dish_recipe_ids or [])}
+        suggestions = _discover_suggestions(session, household, week_items)
+        recipe_ids.update(recipe.id for recipe in suggestions)
+        recipe_cache = {recipe.id: recipe for recipe in session.query(Recipe).filter(Recipe.id.in_(recipe_ids)).all()}
+
+        text = format_weekly_owner_email(household, week_start, week_items, recipe_cache, suggestions)
+        send_owner_email(household, text)
+        logger.info("Sent weekly owner email for household %s to %s", household_id, household.owner_email)
+        return True
+    except Exception:
+        logger.exception("Failed to send weekly owner email for household %s", household_id)
+        return False
+    finally:
+        session.close()
 
 
 def monthly_rollup_job():
