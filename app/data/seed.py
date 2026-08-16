@@ -7,33 +7,50 @@ from app.models import Recipe, RegionCuisineMap
 RECIPES_PATH = Path(__file__).parent / "recipes_seed.json"
 REGION_CUISINE_PATH = Path(__file__).parent / "region_cuisine_seed.json"
 
+_CHUNK_SIZE = 500  # rows per statement - keeps bound-param counts sane, still few round-trips overall
+
+
+def _chunked(items, size):
+    for i in range(0, len(items), size):
+        yield items[i : i + size]
+
 
 def seed_recipes(path: Path = RECIPES_PATH):
     """Load the Indian recipe universe (default: the small hand-curated
     fixture; pass app/data/recipes_ingested.json once scripts/ingest_recipes.py
     has run) into the DB. Safe to re-run: upserts by recipe id.
 
-    Bulk, not per-row get()+setattr()/add(): that was ~2 round-trips per
-    recipe (a SELECT existence check, then an INSERT or UPDATE), which is
-    fine against local SQLite but took several minutes - long enough to
-    time out - against a real network-hop DB (Supabase's pooler, from
-    Render). One SELECT for all existing ids, then one batched INSERT and
-    one batched UPDATE, gets this down to low single-digit seconds."""
+    One real multi-row `INSERT ... ON CONFLICT DO UPDATE` per chunk, not
+    session.bulk_insert_mappings()/bulk_update_mappings(): those looked
+    like an improvement over the original per-row get()+setattr()/add()
+    loop, but bulk_update_mappings still executes one UPDATE per row under
+    the hood (psycopg2's executemany doesn't collapse UPDATEs into fewer
+    round-trips the way SQLAlchemy 2.0's insertmanyvalues does for plain
+    INSERTs) - fine against local SQLite's near-zero latency, but still
+    thousands of round-trips against a real network hop (Supabase's
+    pooler, from Render), which is exactly what timed out in production.
+    ON CONFLICT DO UPDATE is a single statement covering both cases, so
+    this is genuinely ~9 round-trips total (4262 recipes / 500-row
+    chunks) regardless of how many already exist."""
+    from sqlalchemy.dialects import postgresql, sqlite
+
     init_db()
     recipes = json.loads(Path(path).read_text())
 
     session = get_session()
     try:
-        existing_ids = {row[0] for row in session.query(Recipe.id).all()}
-        to_insert = [r for r in recipes if r["id"] not in existing_ids]
-        to_update = [r for r in recipes if r["id"] in existing_ids]
+        dialect = session.bind.dialect.name
+        insert = postgresql.insert if dialect == "postgresql" else sqlite.insert
+        update_cols = {c.name: c for c in Recipe.__table__.columns if c.name != "id"}
 
-        if to_insert:
-            session.bulk_insert_mappings(Recipe, to_insert)
-        if to_update:
-            session.bulk_update_mappings(Recipe, to_update)
+        for chunk in _chunked(recipes, _CHUNK_SIZE):
+            stmt = insert(Recipe).values(chunk)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["id"], set_={name: stmt.excluded[name] for name in update_cols}
+            )
+            session.execute(stmt)
         session.commit()
-        print(f"Seeded {len(recipes)} recipes ({len(to_insert)} new, {len(to_update)} updated).")
+        print(f"Seeded {len(recipes)} recipes.")
     finally:
         session.close()
 
