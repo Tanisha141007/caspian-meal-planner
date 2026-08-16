@@ -8,6 +8,7 @@ from app.api.schemas import AssignRequest, GenerateWeekRequest, SwapRequest
 from app.api.serializers import serialize_day_plan
 from app.config import llm_configured
 from app.meal_planner.generator import generate_weekly_plan, regenerate_single_meal
+from app.messaging.weekly_email import active_week_items
 from app.models import Household, MealPlan, MealPlanItem, Recipe
 
 _LLM_NOT_CONFIGURED = "No LLM provider key configured yet (GEMINI_API_KEY/ANTHROPIC_API_KEY) - can't generate a plan"
@@ -31,28 +32,9 @@ def _recipe_cache_for(db, items: list) -> dict:
 def _week_days(db, household_id: int, week_start: dt.date) -> list:
     """Only the *active* plan's items - a superseded regeneration for the
     same week must not also show up (see generate_weekly_plan's supersede
-    step in app/meal_planner/generator.py)."""
-    active_plan_ids = {
-        p.id
-        for p in db.query(MealPlan)
-        .filter(
-            MealPlan.household_id == household_id,
-            MealPlan.period_type == "week",
-            MealPlan.period_start == week_start,
-            MealPlan.status == "active",
-        )
-        .all()
-    }
-    items = (
-        db.query(MealPlanItem)
-        .filter(
-            MealPlanItem.household_id == household_id,
-            MealPlanItem.date >= week_start,
-            MealPlanItem.date < week_start + dt.timedelta(days=7),
-            MealPlanItem.meal_plan_id.in_(active_plan_ids) if active_plan_ids else False,
-        )
-        .all()
-    )
+    step in app/meal_planner/generator.py). Shares that query with the weekly
+    family email so both read a week the same way."""
+    items = active_week_items(db, household_id, week_start)
     recipe_cache = _recipe_cache_for(db, items)
     by_date = defaultdict(dict)
     for it in items:

@@ -109,6 +109,9 @@ def serialize_household(household) -> dict:
         # show this prominently until cookLinked is true.
         "linkCode": household.link_code,
         "cookLinked": bool(household.caspian_conversation_id),
+        # Weekly family email (Monday) - distinct from the cook's daily message.
+        "ownerEmail": household.owner_email or "",
+        "weeklyEmailEnabled": bool(household.weekly_email_enabled),
     }
 
 

@@ -8,7 +8,7 @@ Run with: uvicorn app.api.main:app --reload
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import ask_ai, households, notify, plan, recipes
+from app.api.routers import ask_ai, email_chart, households, notify, plan, recipes
 from app.config import CORS_ORIGINS
 from app.db import init_db
 
@@ -29,6 +29,7 @@ app.include_router(recipes.router)
 app.include_router(plan.router)
 app.include_router(ask_ai.router)
 app.include_router(notify.router)
+app.include_router(email_chart.router)
 
 
 @app.get("/health")

@@ -8,7 +8,8 @@ import logging
 
 from app.db import get_session
 from app.meal_planner.generator import generate_weekly_plan, monthly_shopping_list
-from app.messaging.handler import get_client, send_daily_message
+from app.messaging.handler import get_client, send_daily_message, send_owner_email
+from app.messaging.weekly_email import build_weekly_email, this_monday
 from app.models import Household, MealPlanItem, Recipe
 
 logger = logging.getLogger("scheduler")
@@ -63,6 +64,45 @@ def monthly_rollup_job():
             logger.exception("Failed to send monthly rollup to household %s", h.id)
 
 
+def weekly_owner_email_job():
+    """Monday morning: mails each family their whole week's chart plus a few
+    new dishes they could add. Reads the plan weekly_plan_job() generated the
+    evening before - it never generates, so a household whose Sunday
+    generation failed is skipped and logged rather than mailed a blank week.
+
+    Goes to the family (Household.owner_email), not the cook - the cook keeps
+    getting one day at a time on their own channel via daily_send_job()."""
+    session = get_session()
+    try:
+        households = (
+            session.query(Household)
+            .filter(Household.active.is_(True))
+            .filter(Household.weekly_email_enabled.is_(True))
+            .filter(Household.owner_email.isnot(None))
+            .all()
+        )
+        week_start = this_monday()
+
+        for h in households:
+            try:
+                email = build_weekly_email(session, h, week_start)
+                if not email["days_planned"]:
+                    logger.warning(
+                        "No active plan for household %s (%s) week of %s - skipping weekly email",
+                        h.id, h.name, week_start,
+                    )
+                    continue
+                send_owner_email(h, email["text"], email["blocks"])
+                logger.info(
+                    "Mailed weekly chart to household %s (%s): %s days, %s suggestions",
+                    h.id, h.name, email["days_planned"], len(email["suggestions"]),
+                )
+            except Exception:
+                logger.exception("Failed to send weekly email for household %s", h.id)
+    finally:
+        session.close()
+
+
 def daily_send_job(send_time: str = None):
     """Pushes today's breakfast/lunch/snack/dinner - with ingredients and
     portion sizes - to every household due at this send_time."""
@@ -104,11 +144,23 @@ def daily_send_job(send_time: str = None):
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 
-    from app.config import APP_TIMEZONE
+    from app.config import APP_TIMEZONE, WEEKLY_EMAIL_TIME
 
     scheduler = BackgroundScheduler(timezone=APP_TIMEZONE)
     scheduler.add_job(weekly_plan_job, "cron", day_of_week="sun", hour=20, id="weekly_plan")
     scheduler.add_job(monthly_rollup_job, "cron", day=1, hour=8, id="monthly_rollup")
+
+    # Monday, after Sunday 20:00's generation has already run - the email job
+    # only reads the plan, so it must not be scheduled before it exists.
+    email_hour, email_minute = (int(x) for x in WEEKLY_EMAIL_TIME.split(":"))
+    scheduler.add_job(
+        weekly_owner_email_job,
+        "cron",
+        day_of_week="mon",
+        hour=email_hour,
+        minute=email_minute,
+        id="weekly_owner_email",
+    )
 
     session = get_session()
     try:

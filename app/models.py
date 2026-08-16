@@ -66,6 +66,18 @@ class Household(Base):
     kids_count = Column(Integer, default=0)
     notes = Column(Text, default="")  # free-text prefs fed straight into the LLM prompt
 
+    # The family's own email - where the Monday chart goes. Distinct from the
+    # cook's channel: the cook gets one day at a time over Telegram/SMS, the
+    # family gets the whole week plus suggestions by email. Captured from the
+    # Supabase JWT's `email` claim at signup (app/api/deps.py), overridable
+    # via PATCH so the chart can go somewhere other than the login address.
+    owner_email = Column(String, nullable=True)
+    weekly_email_enabled = Column(Boolean, default=True)
+    # Set once the family has replied to one of these emails. Until then
+    # sends go out via initiate() (cold-start, plain text only); after it,
+    # via send_message() with rich blocks - see app/messaging/handler.py.
+    owner_conversation_id = Column(String, nullable=True)
+
     active = Column(Boolean, default=True)
     # The code the family relays to their cook - the cook's first message
     # to the bot/number, whatever it says, must be exactly this code. Once

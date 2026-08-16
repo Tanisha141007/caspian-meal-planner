@@ -119,6 +119,28 @@ def narrow_candidates(candidates: list, weights: dict, meal_slots: list, per_slo
     return result
 
 
+def suggested_recipes(session, household: Household, exclude_ids=None, limit: int = 6) -> list:
+    """"New this week" picks for the Monday email - the same diet/allergy-safe
+    candidate set Discover's rows are built from (app/api/routers/recipes.py),
+    minus anything already on the plan we're mailing out, ranked by the
+    household's cuisine weighting so the suggestions look like *their* food
+    rather than a random slice of the table.
+
+    Deterministic given the same inputs (no shuffle): this runs once a week
+    and the family sees the result, so a stable "best N" beats a lucky draw."""
+    exclude = set(exclude_ids or [])
+    weights = cuisine_weights(session, household)
+    pool = [r for r in candidate_recipes(session, household) if r.id not in exclude]
+
+    def rank(recipe):
+        w = weights.get(recipe.cuisine_style, _DEFAULT_CUISINE_WEIGHT)
+        if recipe.cuisine_style == "pan-india":
+            w = max(w, _PAN_INDIA_WEIGHT)
+        return (-w, recipe.name)
+
+    return sorted(pool, key=rank)[:limit]
+
+
 def recent_recipe_ids(session, household_id: int, since: dt.date):
     items = (
         session.query(MealPlanItem)

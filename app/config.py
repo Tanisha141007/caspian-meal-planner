@@ -30,6 +30,20 @@ TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 # Caspian's) - the cook must message it first. See Household.link_code.
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
+# The inbox the weekly family email is sent from. Username picks a readable
+# mailbox on Caspian's platform domain (mealplanner@agents.trycaspianai.com);
+# set CASPIAN_EMAIL_DOMAIN too only if you've verified a custom domain with
+# client.add_domain(). Both blank = Caspian assigns a default address.
+CASPIAN_EMAIL_USERNAME = os.environ.get("CASPIAN_EMAIL_USERNAME", "mealplanner")
+CASPIAN_EMAIL_DOMAIN = os.environ.get("CASPIAN_EMAIL_DOMAIN", "")
+
+# When the Monday chart goes out, local APP_TIMEZONE time. The week's plan
+# already exists by then - weekly_plan_job() generates it Sunday 20:00 - so
+# this only reads and mails it.
+WEEKLY_EMAIL_TIME = os.environ.get("WEEKLY_EMAIL_TIME", "08:00")
+# How many "you could also add these" dishes the email carries.
+WEEKLY_EMAIL_SUGGESTIONS = int(os.environ.get("WEEKLY_EMAIL_SUGGESTIONS", "6"))
+
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./caspian_meals.db")
 APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")
 

@@ -9,12 +9,16 @@ first message must be exactly this code" is the one mechanism that works
 uniformly across every channel Caspian supports."""
 
 import datetime as dt
+import logging
 import os
 
 from caspian_sdk import CommClient
+from sqlalchemy import func
 
 from app.config import (
     CASPIAN_API_KEY,
+    CASPIAN_EMAIL_DOMAIN,
+    CASPIAN_EMAIL_USERNAME,
     TELEGRAM_BOT_TOKEN,
     TWILIO_ACCOUNT_SID,
     TWILIO_AUTH_TOKEN,
@@ -25,8 +29,15 @@ from app.meal_planner.generator import interpret_cook_reply
 from app.messaging.formatter import format_daily_message
 from app.models import Feedback, Household, MealPlanItem
 
+logger = logging.getLogger("messaging")
+
 _client = None
+# Two live connections, not one: the cook's channel (Telegram by default)
+# carries the daily message, and a separate email connection carries the
+# weekly chart to the family. Both feed the same on_message handler - which
+# is why handle() below routes on channel before deciding what a message means.
 _connection = None
+_email_connection = None
 
 
 def get_client() -> CommClient:
@@ -72,6 +83,54 @@ def connect_channel():
     return _connection
 
 
+def connect_email_channel():
+    """Provisions (or re-attaches to) the inbox the weekly family email is
+    sent from - e.g. mealplanner@agents.trycaspianai.com. Separate connection
+    from connect_channel()'s cook channel, and safe to call repeatedly:
+    Caspian returns the existing connection for the same username/domain
+    rather than minting a second inbox.
+
+    Email is the one channel here that *can* cold-start a conversation, which
+    is what makes the Monday send work at all - the family has never written
+    to us, so there's no conversation to reply into (compare Telegram, where
+    the cook must message first; see Household.link_code)."""
+    global _email_connection
+    if _email_connection is None:
+        _email_connection = get_client().connect_email(
+            username=CASPIAN_EMAIL_USERNAME or None,
+            domain=CASPIAN_EMAIL_DOMAIN or None,
+        )
+    return _email_connection
+
+
+def _household_for_owner_email(session, sender: dict | None):
+    """Matches an inbound *email* back to the family that owns the household,
+    by the address it came from. The cook's link_code handshake doesn't apply
+    here - we mailed them first, at an address we already had on file, so the
+    From address is the identity."""
+    address = ""
+    if isinstance(sender, dict):
+        # Caspian's sender shape isn't identical across channels; for email
+        # the address has turned up under several keys depending on provider,
+        # so check the plausible ones rather than assuming one.
+        for key in ("email", "address", "id", "handle"):
+            value = sender.get(key)
+            if isinstance(value, str) and "@" in value:
+                address = value
+                break
+    if not address:
+        return None
+    address = address.strip().lower()
+    # func.lower(), not ilike(): `_` and `%` are wildcards to ILIKE, so an
+    # address like first_last@x.com would also match firstXlast@x.com.
+    return (
+        session.query(Household)
+        .filter(Household.owner_email.isnot(None))
+        .filter(func.lower(Household.owner_email) == address)
+        .first()
+    )
+
+
 def _household_for_conversation(session, conversation_id: str):
     return session.query(Household).filter(Household.caspian_conversation_id == conversation_id).first()
 
@@ -96,6 +155,38 @@ def _ack_for_intent(intent: dict) -> str:
     }.get(intent.get("type"), "Got your message, thanks!")
 
 
+def _handle_owner_email(session, message) -> bool:
+    """The family replying to their weekly chart. Returns False if this email
+    isn't from a known household owner, so the caller can fall through to the
+    normal (cook) path rather than swallowing the message."""
+    household = (
+        session.query(Household)
+        .filter(Household.owner_conversation_id == message.conversation_id)
+        .first()
+    ) or _household_for_owner_email(session, message.sender)
+
+    if household is None:
+        return False
+
+    # First reply is what gives us a conversation to send into - every send
+    # after this one can use blocks instead of the cold-start plain text.
+    if not household.owner_conversation_id:
+        household.owner_conversation_id = message.conversation_id
+
+    intent = interpret_cook_reply(message.text or "", [])
+    session.add(
+        Feedback(
+            household_id=household.id,
+            conversation_id=message.conversation_id,
+            raw_text=message.text or "",
+            parsed_intent={**intent, "from": "owner"},
+        )
+    )
+    session.commit()
+    message.reply(_ack_for_intent(intent) + " It'll show up in the next chart.")
+    return True
+
+
 def register_handler():
     client = get_client()
 
@@ -103,6 +194,13 @@ def register_handler():
     def handle(message):
         session = get_session()
         try:
+            # Both connections share this handler, so an inbound email is the
+            # family answering their weekly chart, not a cook who needs to be
+            # link-code matched. Falls through if the address isn't one we
+            # mailed - e.g. a stray reply to a forwarded copy.
+            if message.channel == "email" and _handle_owner_email(session, message):
+                return
+
             household = _household_for_conversation(session, message.conversation_id)
 
             if household is None:
@@ -144,6 +242,41 @@ def register_handler():
             session.close()
 
     return handle
+
+
+def send_owner_email(household: Household, text: str, blocks: list = None) -> str:
+    """Mails one household's family. Rich blocks once we have a conversation
+    with them (they've replied at least once); plain text via initiate()
+    before that, since caspian-sdk 0.6.4's initiate() accepts `text` only -
+    no blocks, no html, no subject. Returns the text form either way, so
+    callers have something to log or preview regardless of which path ran."""
+    if not household.owner_email:
+        raise RuntimeError(
+            f"Household {household.id} ({household.name}) has no owner_email set - "
+            "nothing to mail. Set it via PATCH /api/households/{id}."
+        )
+
+    client = get_client()
+
+    if household.owner_conversation_id:
+        client.send_message(household.owner_conversation_id, text=text, blocks=blocks or None)
+        return text
+
+    connection = connect_email_channel()
+    result = client.initiate(connection["id"], recipient=household.owner_email, text=text)
+
+    # Remember the conversation this opened, so next Monday's mail can go out
+    # as blocks and land in the same thread instead of starting a new one.
+    conv_id = result.get("conversation_id") if isinstance(result, dict) else None
+    if conv_id:
+        session = get_session()
+        try:
+            db_household = session.get(Household, household.id)
+            db_household.owner_conversation_id = conv_id
+            session.commit()
+        finally:
+            session.close()
+    return text
 
 
 def send_daily_message(household: Household, slot_items: dict, recipe_cache: dict) -> str:

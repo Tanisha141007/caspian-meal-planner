@@ -43,15 +43,50 @@ Meal-plan generator (app/meal_planner/generator.py, Claude)
             v
 Scheduler (app/scheduler/jobs.py, APScheduler)
   - Sun 20:00  -> generate next week's chart per household
+  - Mon 08:00  -> email each family the whole week + new suggestions
   - 1st, 08:00 -> aggregate the month into one ingredient shopping list
   - daily, per household send_time -> format + send today's meals
             |
             v
 Caspian CommClient (app/messaging/handler.py)
   - send_message() / initiate() pushes today's meals to the cook
-  - on_message() reads the cook's reply, classifies it with Claude
-    (dislike / swap request / ingredient issue / confirmation / question),
-    logs it as Feedback, and acks it
+  - send_owner_email() mails the family their week (separate connection)
+  - on_message() reads the reply - from the cook or the family - classifies
+    it with the LLM (dislike / swap request / ingredient issue /
+    confirmation / question), logs it as Feedback, and acks it
+```
+
+## Two audiences, two channels
+
+The cook and the family get different things over different Caspian
+connections, from the same process:
+
+| | Cook | Family (the app's user) |
+|---|---|---|
+| Channel | Telegram (default), SMS, WhatsApp | Email |
+| Cadence | Daily, at `Household.send_time` | Mondays, `WEEKLY_EMAIL_TIME` |
+| Content | Today's meals + ingredients + portions | The whole week's chart, new dish suggestions, the week's shopping list |
+| Addressed by | `link_code` handshake (the cook messages in first) | `Household.owner_email`, seeded from the Supabase login |
+
+The email half is the one channel here that can **cold-start** a
+conversation - `initiate()` - so the family never has to write in first.
+That path is plain text only (caspian-sdk 0.6.4's `initiate()` takes `text`
+and nothing else: no blocks, no HTML, no subject line). Once the family
+replies even once, `owner_conversation_id` is stored and every later Monday
+mail goes out via `send_message(blocks=...)`, which Caspian renders as real
+HTML email - so the first email is plain and the rest are formatted.
+
+The "new this week" suggestions come from the same diet- and allergy-safe
+candidate set that powers the app's Discover tab
+(`candidate_recipes()`), minus whatever is already on the week's chart,
+ranked by the household's cuisine weighting - see `suggested_recipes()` in
+`app/meal_planner/generator.py`.
+
+To preview or send it off-schedule (rather than waiting for Monday):
+
+```
+GET  /api/households/{id}/weekly-email/preview   # renders, sends nothing
+POST /api/households/{id}/weekly-email/send      # sends now
 ```
 
 ## Data model
@@ -59,7 +94,9 @@ Caspian CommClient (app/messaging/handler.py)
 - **Household** - one row per family: cook's phone, diet type, allergies,
   dislikes, preferred cuisines, spice level, family size, kids count,
   free-text notes (fed straight into the LLM prompt), and the
-  `caspian_conversation_id` once the cook has texted in.
+  `caspian_conversation_id` once the cook has texted in. `owner_email` /
+  `weekly_email_enabled` / `owner_conversation_id` cover the Monday email to
+  the family (see "Two audiences, two channels" below).
 - **Recipe** - one dish: region, cuisine, meal types, diet, spice level,
   tags, and ingredients scaled to **1 serving** (multiplied by
   `portion_servings` at send time). This is the "training data" from the

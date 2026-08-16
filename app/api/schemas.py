@@ -4,7 +4,7 @@ sync, FastAPI just serializes whatever the serializer returns."""
 
 import datetime as dt
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 DIET_TYPES = ("veg", "vegan", "jain", "eggetarian", "non-veg")
 SPICE_LEVELS = ("mild", "medium", "hot")
@@ -27,6 +27,10 @@ class HouseholdCreate(BaseModel):
     notes: str = ""
     preferred_channel: str = Field(default="sms", pattern="|".join(CHANNELS))
     lead_hours: int = Field(default=12, ge=1, le=48)
+    # Where the Monday chart goes. Omit it and the signed-in user's own email
+    # (from the Supabase token) is used - see routers/households.py.
+    owner_email: EmailStr | None = None
+    weekly_email_enabled: bool = True
 
 
 class HouseholdUpdate(BaseModel):
@@ -45,6 +49,8 @@ class HouseholdUpdate(BaseModel):
     notes: str | None = None
     preferred_channel: str | None = Field(default=None, pattern="|".join(CHANNELS))
     lead_hours: int | None = Field(default=None, ge=1, le=48)
+    owner_email: EmailStr | None = None
+    weekly_email_enabled: bool | None = None
 
 
 class GenerateWeekRequest(BaseModel):
@@ -69,3 +75,7 @@ class AskAIRequest(BaseModel):
 
 class NotifyCookRequest(BaseModel):
     date: dt.date | None = None  # defaults to today
+
+
+class WeeklyEmailRequest(BaseModel):
+    week_start: dt.date | None = None  # defaults to the current week's Monday
