@@ -4,6 +4,8 @@ needed minimal changes to go from local mock data to this API (see M1 in
 the integration plan). Heuristic where the backend has no equivalent field
 (`art`) - same "approximate, not exact" spirit as the Phase 1 ingestion."""
 
+from app.nutrition import estimate_nutrition
+
 DIET_BACKEND_TO_FRONTEND = {"veg": "veg", "vegan": "vegan", "egg": "egg", "non-veg": "nonveg"}
 CATEGORY_BACKEND_TO_FRONTEND = {
     "protein-heavy": "protein",
@@ -70,6 +72,13 @@ def _art_for(recipe) -> str:
     return "curry"
 
 
+def _nutrition_for(ingredients: list) -> dict:
+    """Per-serving estimate (see app/nutrition.py - keyword-matched against
+    standard per-100g macro values, not a real nutrition database)."""
+    n = estimate_nutrition(ingredients or [])
+    return {"protein": n["protein_g"], "carbs": n["carbs_g"], "fat": n["fat_g"], "calories": n["calories"]}
+
+
 def serialize_recipe(recipe) -> dict:
     return {
         "id": recipe.id,
@@ -84,6 +93,7 @@ def serialize_recipe(recipe) -> dict:
         # per-serving, same convention the frontend's mock data already used -
         # it multiplies by household size client-side (usePlanner().scaled()).
         "ingredients": [{"name": i["item"], "qty": i["qty"], "unit": i["unit"]} for i in (recipe.ingredients or [])],
+        "nutrition": _nutrition_for(recipe.ingredients),
     }
 
 
@@ -140,6 +150,9 @@ def _serialize_combo_recipe(dish_recipe_ids: list, recipe_cache: dict) -> dict:
         "minutes": max((r.prep_time_min for r in known), default=30),
         "art": _art_for(primary) if primary else "curry",
         "ingredients": [{"name": i["item"], "qty": i["qty"], "unit": i["unit"]} for i in ingredients],
+        # ingredients here are already the combo-merged, per-serving list -
+        # estimate_nutrition() takes the same {item, qty, unit} shape directly.
+        "nutrition": _nutrition_for(ingredients),
     }
 
 
