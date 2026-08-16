@@ -12,7 +12,7 @@ import datetime as dt
 import logging
 import os
 
-from caspian_sdk import CommClient
+from caspian_sdk import AccountRequiredError, CommClient, CommError, InsufficientCreditError
 from sqlalchemy import func
 
 from app.config import (
@@ -38,6 +38,32 @@ _client = None
 # is why handle() below routes on channel before deciding what a message means.
 _connection = None
 _email_connection = None
+
+
+def describe_comm_error(exc: Exception) -> str:
+    """Turns an SDK exception into something an operator can act on.
+
+    The SDK distinguishes two failure modes that look identical if you only
+    print str(exc), and that have completely different fixes: a paid channel
+    that needs a one-time developer sign-in (401), and an account that has run
+    out of credit or hit its spend cap (402/429). Everything upstream catches
+    broad Exceptions, so without this the daily send just logs "send failed".
+    """
+    if isinstance(exc, AccountRequiredError):
+        return (
+            f"Caspian needs a one-time developer sign-in before this channel can send "
+            f"({getattr(exc, 'message', None) or exc}). Run: python scripts/caspian_status.py --login"
+        )
+    if isinstance(exc, InsufficientCreditError):
+        balance = getattr(exc, "balance_cents", None)
+        balance_text = f" (balance {balance}c)" if balance is not None else ""
+        return (
+            f"Caspian is out of credit or has hit its spend cap{balance_text} - top up at "
+            "dashboard.trycaspianai.com, then retry."
+        )
+    if isinstance(exc, CommError):
+        return f"Caspian API error {exc.status_code}: {exc.detail}"
+    return str(exc)
 
 
 def get_client() -> CommClient:
@@ -101,6 +127,29 @@ def connect_email_channel():
             domain=CASPIAN_EMAIL_DOMAIN or None,
         )
     return _email_connection
+
+
+_behavior_prompt = None
+
+
+def channel_behavior_prompt() -> str:
+    """Caspian's own per-channel etiquette guidance for the channels this
+    deployment has connected (SMS length limits, email having no typing
+    indicator, iMessage having no markdown, ...), to append to the system
+    prompt of anything that composes a reply.
+
+    Fetched once and cached; returns "" if the gateway can't be reached, so an
+    unreachable Caspian degrades the agent's phrasing rather than breaking the
+    reply path entirely."""
+    global _behavior_prompt
+    if _behavior_prompt is None:
+        try:
+            _behavior_prompt = get_client().behavior_prompt() or ""
+        except Exception as e:
+            logger.warning("Could not fetch Caspian behavior prompt (%s) - continuing without it",
+                           describe_comm_error(e))
+            _behavior_prompt = ""
+    return _behavior_prompt
 
 
 def _household_for_owner_email(session, sender: dict | None):
@@ -173,7 +222,13 @@ def _handle_owner_email(session, message) -> bool:
     if not household.owner_conversation_id:
         household.owner_conversation_id = message.conversation_id
 
-    intent = interpret_cook_reply(message.text or "", [])
+    intent = interpret_cook_reply(
+        message.text or "",
+        [],
+        channel=message.channel,
+        sender_role="family",
+        channel_guidance=channel_behavior_prompt(),
+    )
     session.add(
         Feedback(
             household_id=household.id,
@@ -226,7 +281,13 @@ def register_handler():
             )
             todays_recipe_ids = [rid for it in todays_items for rid in (it.dish_recipe_ids or [])]
 
-            intent = interpret_cook_reply(message.text or "", todays_recipe_ids)
+            intent = interpret_cook_reply(
+                message.text or "",
+                todays_recipe_ids,
+                channel=message.channel,
+                sender_role="cook",
+                channel_guidance=channel_behavior_prompt(),
+            )
 
             session.add(
                 Feedback(

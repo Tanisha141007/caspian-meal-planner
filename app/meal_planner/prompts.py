@@ -88,20 +88,36 @@ Return JSON matching exactly this shape:
     return PLAN_SYSTEM_PROMPT, user_prompt
 
 
-FEEDBACK_SYSTEM_PROMPT = """You read one WhatsApp/SMS reply from a family's cook about \
-today's planned meals and turn it into structured intent. Categorize into exactly one \
-type: "dislike" (didn't like / don't repeat a dish), "swap_request" (wants a different \
-dish instead, now or going forward), "ingredient_issue" (missing/can't get an ingredient), \
-"confirmation" (acknowledging, no action needed), "question", or "other". If a specific \
-recipe_id from the provided list is clearly referenced, include it; otherwise use null. \
-Respond with ONLY valid JSON: {"type": "...", "recipe_id": "..." or null, "summary": "one \
-short sentence"} - no prose, no markdown fences."""
+FEEDBACK_SYSTEM_PROMPT = """You read one inbound reply about a household's planned meals \
+and turn it into structured intent. It may come from the family's cook (replying to a \
+daily message on Telegram/SMS/WhatsApp) or from the family themselves (replying to their \
+weekly meal-chart email) - the sender and channel are stated in the user message, and a \
+cook's "couldn't get okra" is an ingredient_issue while a family's "we're bored of dal" \
+is a dislike. Categorize into exactly one type: "dislike" (didn't like / don't repeat a \
+dish), "swap_request" (wants a different dish instead, now or going forward), \
+"ingredient_issue" (missing/can't get an ingredient), "confirmation" (acknowledging, no \
+action needed), "question", or "other". If a specific recipe_id from the provided list is \
+clearly referenced, include it; otherwise use null. Respond with ONLY valid JSON: \
+{"type": "...", "recipe_id": "..." or null, "summary": "one short sentence"} - no prose, \
+no markdown fences."""
 
 
-def build_feedback_prompt(message_text, todays_recipe_ids):
-    return FEEDBACK_SYSTEM_PROMPT, (
+def build_feedback_prompt(
+    message_text, todays_recipe_ids, channel: str = "", sender_role: str = "cook", channel_guidance: str = ""
+):
+    """`channel_guidance` is Caspian's own per-channel etiquette text
+    (client.behavior_prompt(), see app/messaging/handler.py) - appended rather
+    than interpolated so an empty/unreachable gateway changes nothing."""
+    system = FEEDBACK_SYSTEM_PROMPT
+    if channel_guidance:
+        system += "\n\nChannel etiquette for the channels this agent is connected to:\n" + channel_guidance
+
+    sender = "the family's cook" if sender_role == "cook" else "the family (the household's own account)"
+    channel_line = f" over {channel}" if channel else ""
+
+    return system, (
         f"Today's planned recipe ids: {json.dumps(todays_recipe_ids)}\n\n"
-        f'Cook\'s message: "{message_text}"'
+        f'Message from {sender}{channel_line}: "{message_text}"'
     )
 
 

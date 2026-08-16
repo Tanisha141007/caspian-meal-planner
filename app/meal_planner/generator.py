@@ -310,10 +310,20 @@ def monthly_shopping_list(household_id: int, month_start: dt.date, num_days: int
         session.close()
 
 
-def interpret_cook_reply(message_text: str, todays_recipe_ids: list) -> dict:
-    """Turns one inbound WhatsApp/SMS message from the cook into structured
-    feedback: dislike, swap request, ingredient issue, confirmation, etc."""
-    system, user = build_feedback_prompt(message_text, todays_recipe_ids)
+def interpret_cook_reply(
+    message_text: str,
+    todays_recipe_ids: list,
+    channel: str = "",
+    sender_role: str = "cook",
+    channel_guidance: str = "",
+) -> dict:
+    """Turns one inbound message into structured feedback: dislike, swap
+    request, ingredient issue, confirmation, etc. Handles both senders - the
+    cook replying to their daily message, and the family replying to the
+    weekly chart email - since the same intents arrive from both."""
+    system, user = build_feedback_prompt(
+        message_text, todays_recipe_ids, channel=channel, sender_role=sender_role, channel_guidance=channel_guidance
+    )
     return generate_json(system, user, max_tokens=300)
 
 

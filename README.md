@@ -136,6 +136,31 @@ The recipe universe is seeded two ways:
   quantity is marked `"to taste"` rather than guessing a number; `season_tags`
   default to `all-season` (the source data carries no season signal).
 
+## Verifying the Caspian connection
+
+`scripts/caspian_status.py` is the first thing to run on any machine that can
+reach `api.trycaspianai.com` - it checks the key, prints what the account can
+do, and provisions the two connections the app needs:
+
+```bash
+python scripts/caspian_status.py                  # read-only report
+python scripts/caspian_status.py --connect-email  # provision the family inbox
+python scripts/caspian_status.py --connect-cook   # provision the cook's channel
+python scripts/caspian_status.py --login          # paid channels' one-time sign-in
+```
+
+It prints the facts the send paths depend on: the email connection's `address`
+(the From line the family sees), and whether `initiate` is in each connection's
+capabilities (which is what decides cold-start vs. "they must message first").
+
+Failures are reported by kind, because the fixes differ: a paid channel needing
+a one-time developer sign-in (`AccountRequiredError`), an account out of credit
+or past its spend cap (`InsufficientCreditError`), an API validation error, and
+a transport failure that never reached Caspian at all - which says nothing about
+whether the key is valid. `describe_comm_error()` in `app/messaging/handler.py`
+does that mapping, and the scheduler and API routes report through it too, so a
+failed send logs the fix rather than "send failed".
+
 ## Setup
 
 ```bash

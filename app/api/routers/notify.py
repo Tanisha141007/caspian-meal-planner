@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.api.deps import get_db, get_owned_household
 from app.api.schemas import NotifyCookRequest
 from app.config import CASPIAN_API_KEY
-from app.messaging.handler import connect_channel, send_daily_message
+from app.messaging.handler import connect_channel, describe_comm_error, send_daily_message
 from app.models import Household, MealPlanItem, Recipe
 
 router = APIRouter(prefix="/api/households/{household_id}/notify-cook", tags=["notify"])
@@ -52,7 +52,7 @@ def notify_cook(
         for it in items:
             it.delivery_status = "failed"
         db.commit()
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Caspian send failed: {e}") from e
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Caspian send failed: {describe_comm_error(e)}") from e
 
     for it in items:
         it.sent_at = dt.datetime.utcnow()

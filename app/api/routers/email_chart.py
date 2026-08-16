@@ -13,7 +13,7 @@ from app.api.deps import get_db, get_owned_household
 from app.api.schemas import WeeklyEmailRequest
 from app.api.serializers import serialize_recipe
 from app.config import CASPIAN_API_KEY
-from app.messaging.handler import send_owner_email
+from app.messaging.handler import describe_comm_error, send_owner_email
 from app.messaging.weekly_email import build_weekly_email, this_monday
 from app.models import Household
 
@@ -68,7 +68,9 @@ def send_weekly_email(
     try:
         send_owner_email(household, email["text"], email["blocks"])
     except Exception as e:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Caspian email send failed: {e}") from e
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"Caspian email send failed: {describe_comm_error(e)}"
+        ) from e
 
     return {
         "sent": True,

@@ -8,7 +8,7 @@ import logging
 
 from app.db import get_session
 from app.meal_planner.generator import generate_weekly_plan, monthly_shopping_list
-from app.messaging.handler import get_client, send_daily_message, send_owner_email
+from app.messaging.handler import describe_comm_error, get_client, send_daily_message, send_owner_email
 from app.messaging.weekly_email import build_weekly_email, this_monday
 from app.models import Household, MealPlanItem, Recipe
 
@@ -60,8 +60,8 @@ def monthly_rollup_job():
         text = f"Monthly shopping list for {h.name} ({month_start.strftime('%B %Y')}):\n" + ", ".join(lines)
         try:
             client.send_message(h.caspian_conversation_id, text=text)
-        except Exception:
-            logger.exception("Failed to send monthly rollup to household %s", h.id)
+        except Exception as e:
+            logger.exception("Failed to send monthly rollup to household %s: %s", h.id, describe_comm_error(e))
 
 
 def weekly_owner_email_job():
@@ -97,8 +97,8 @@ def weekly_owner_email_job():
                     "Mailed weekly chart to household %s (%s): %s days, %s suggestions",
                     h.id, h.name, email["days_planned"], len(email["suggestions"]),
                 )
-            except Exception:
-                logger.exception("Failed to send weekly email for household %s", h.id)
+            except Exception as e:
+                logger.exception("Failed to send weekly email for household %s: %s", h.id, describe_comm_error(e))
     finally:
         session.close()
 
@@ -132,8 +132,8 @@ def daily_send_job(send_time: str = None):
                 for it in items:
                     it.sent_at = dt.datetime.utcnow()
                     it.delivery_status = "sent"
-            except Exception:
-                logger.exception("Failed to send daily message to household %s", h.id)
+            except Exception as e:
+                logger.exception("Failed to send daily message to household %s: %s", h.id, describe_comm_error(e))
                 for it in items:
                     it.delivery_status = "failed"
             session.commit()
