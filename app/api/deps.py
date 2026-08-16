@@ -51,9 +51,9 @@ def get_db():
         session.close()
 
 
-def get_current_user_id(authorization: str = Header(default="")) -> str:
+def get_current_user(authorization: str = Header(default="")) -> dict:
     """Verifies the Supabase-issued JWT against the project's public JWKS
-    and returns its `sub` claim. 401s on anything wrong - missing header,
+    and returns the user claims we store against households. 401s on anything wrong - missing header,
     bad signature, expired token - never falls back to an unauthenticated
     mode. 503s instead if auth isn't configured yet at all, so that's
     distinguishable from "your token is bad" during setup."""
@@ -72,7 +72,11 @@ def get_current_user_id(authorization: str = Header(default="")) -> str:
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token missing sub claim")
-    return user_id
+    return {"id": user_id, "email": payload.get("email")}
+
+
+def get_current_user_id(user: dict = Depends(get_current_user)) -> str:
+    return user["id"]
 
 
 def get_owned_household(

@@ -42,6 +42,10 @@ class Household(Base):
     # household created through app/api/ sets it and every app/api/ route
     # scopes its queries by it - see app/api/deps.py::get_current_user_id.
     owner_user_id = Column(String, nullable=True, unique=True, index=True)
+    # Email claim from the Supabase auth token. Used for household-owner
+    # communications, like the Sunday weekly plan email.
+    owner_email = Column(String, nullable=True, index=True)
+    owner_caspian_conversation_id = Column(String, nullable=True)
     name = Column(String, nullable=False)
     cook_name = Column(String, nullable=False)
     cook_phone = Column(String, nullable=False, unique=True)  # E.164, e.g. +9198XXXXXXXX

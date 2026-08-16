@@ -9,12 +9,16 @@ first message must be exactly this code" is the one mechanism that works
 uniformly across every channel Caspian supports."""
 
 import datetime as dt
+import logging
 import os
 
 from caspian_sdk import CommClient
 
 from app.config import (
     CASPIAN_API_KEY,
+    CASPIAN_EMAIL_CONNECTION_ID,
+    CASPIAN_EMAIL_DOMAIN,
+    CASPIAN_EMAIL_USERNAME,
     TELEGRAM_BOT_TOKEN,
     TWILIO_ACCOUNT_SID,
     TWILIO_AUTH_TOKEN,
@@ -27,6 +31,8 @@ from app.models import Feedback, Household, MealPlanItem
 
 _client = None
 _connection = None
+_email_connection = None
+logger = logging.getLogger(__name__)
 
 
 def get_client() -> CommClient:
@@ -62,6 +68,8 @@ def connect_channel():
         _connection = get_client().connect_whatsapp()
     elif channel == "telegram":
         _connection = get_client().connect_telegram(bot_token=TELEGRAM_BOT_TOKEN)
+    elif channel == "email":
+        _connection = get_email_connection()
     else:
         _connection = get_client().connect_phone(
             provider="twilio",
@@ -70,6 +78,30 @@ def connect_channel():
             from_number=TWILIO_FROM_NUMBER,
         )
     return _connection
+
+
+def get_email_connection():
+    """Dedicated owner-email connection.
+
+    The cook channel is configured by CASPIAN_CHANNEL. Weekly owner emails
+    are always email, so they use their own connection id or mailbox name.
+    """
+    global _email_connection
+    if _email_connection is not None:
+        return _email_connection
+
+    if CASPIAN_EMAIL_CONNECTION_ID:
+        _email_connection = {"id": CASPIAN_EMAIL_CONNECTION_ID, "capabilities": ["initiate"]}
+        return _email_connection
+
+    if not CASPIAN_EMAIL_USERNAME:
+        raise RuntimeError("CASPIAN_EMAIL_USERNAME or CASPIAN_EMAIL_CONNECTION_ID must be set for weekly emails")
+
+    kwargs = {"username": CASPIAN_EMAIL_USERNAME}
+    if CASPIAN_EMAIL_DOMAIN:
+        kwargs["domain"] = CASPIAN_EMAIL_DOMAIN
+    _email_connection = get_client().connect_email(**kwargs)
+    return _email_connection
 
 
 _ready = False
@@ -193,4 +225,67 @@ def send_daily_message(household: Household, slot_items: dict, recipe_cache: dic
             session.commit()
         finally:
             session.close()
+    return text
+
+
+def _conversation_id_from_result(result) -> str | None:
+    if not isinstance(result, dict):
+        return None
+    return (
+        result.get("conversation_id")
+        or (result.get("conversation") or {}).get("id")
+        or (result.get("message") or {}).get("conversation_id")
+    )
+
+
+def _remember_owner_email_conversation(household_id: int, conversation_id: str | None) -> None:
+    if not conversation_id:
+        return
+    session = get_session()
+    try:
+        db_household = session.get(Household, household_id)
+        if db_household and db_household.owner_caspian_conversation_id != conversation_id:
+            db_household.owner_caspian_conversation_id = conversation_id
+            session.commit()
+    finally:
+        session.close()
+
+
+def _latest_email_conversation_id(connection_id: str) -> str | None:
+    try:
+        conversations = get_client().list_conversations(connection_id=connection_id)
+    except Exception as exc:
+        logger.warning("Could not list Caspian email conversations after initiate: %s", exc)
+        return None
+    if not conversations:
+        return None
+    latest = sorted(conversations, key=lambda c: c.get("created_at") or "")[-1]
+    return latest.get("id")
+
+
+def send_owner_email(household: Household, message) -> str:
+    """Sends a Caspian email to the signed-in household owner."""
+    if not household.owner_email:
+        raise RuntimeError(f"Household {household.id} has no owner_email")
+
+    connection = get_email_connection()
+    if "initiate" not in (connection.get("capabilities") or []):
+        raise RuntimeError("Configured Caspian email connection cannot initiate outbound messages")
+
+    if isinstance(message, dict):
+        text = message["text"]
+
+        # Email delivery through Caspian is most reliable as a fresh initiate.
+        # In-thread send_message() can be recorded by Caspian without surfacing
+        # as a visible new Gmail message, so keep the full table in text.
+        result = get_client().initiate(connection["id"], recipient=household.owner_email, text=text)
+        conversation_id = _conversation_id_from_result(result) or _latest_email_conversation_id(connection["id"])
+        _remember_owner_email_conversation(household.id, conversation_id)
+        if not conversation_id:
+            logger.warning("Caspian initiate did not return a conversation id for owner email")
+        return text
+
+    text = message
+    result = get_client().initiate(connection["id"], recipient=household.owner_email, text=text)
+    _remember_owner_email_conversation(household.id, _conversation_id_from_result(result))
     return text
