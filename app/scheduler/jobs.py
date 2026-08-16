@@ -13,6 +13,7 @@ from app.messaging.handler import get_client, send_daily_message, send_owner_ema
 from app.models import Household, MealPlan, MealPlanItem, Recipe
 
 logger = logging.getLogger("scheduler")
+WEEKDAY_KEYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
 
 def _next_monday(today=None) -> dt.date:
@@ -130,29 +131,33 @@ def daily_send_job(send_time: str = None):
         today = dt.date.today()
         recipe_cache = {r.id: r for r in session.query(Recipe).all()}
 
+        day_key = WEEKDAY_KEYS[today.weekday()]
+
         for h in households:
             if not h.notify_me:
+                continue
+            entries = _schedule_entries_for(h, day_key, send_time)
+            if not entries:
                 continue
             items = (
                 session.query(MealPlanItem)
                 .filter(MealPlanItem.household_id == h.id, MealPlanItem.date == today)
                 .all()
             )
-            selected_meals = set(h.notify_meals or [])
-            items = [it for it in items if it.meal_slot in selected_meals]
             if not items:
                 logger.warning("No meal plan items for household %s on %s - run weekly_plan_job first", h.id, today)
                 continue
 
             slot_items = {it.meal_slot: it for it in items}
-            for item in items:
-                try:
-                    send_daily_message(h, {item.meal_slot: slot_items[item.meal_slot]}, recipe_cache)
-                    item.sent_at = dt.datetime.utcnow()
-                    item.delivery_status = "sent"
-                except Exception:
-                    logger.exception("Failed to send %s daily message to household %s", item.meal_slot, h.id)
-                    item.delivery_status = "failed"
+            for entry in entries:
+                for item in _items_for_entry(entry, slot_items):
+                    try:
+                        send_daily_message(h, {item.meal_slot: slot_items[item.meal_slot]}, recipe_cache, entry.get("message", ""))
+                        item.sent_at = dt.datetime.utcnow()
+                        item.delivery_status = "sent"
+                    except Exception:
+                        logger.exception("Failed to send %s daily message to household %s", item.meal_slot, h.id)
+                        item.delivery_status = "failed"
             session.commit()
     finally:
         session.close()
@@ -175,6 +180,7 @@ def run_due_daily_sends(window_minutes: int = 20):
 
     now_local = dt.datetime.now(ZoneInfo(APP_TIMEZONE))
     today = now_local.date()
+    day_key = WEEKDAY_KEYS[today.weekday()]
 
     session = get_session()
     try:
@@ -185,14 +191,11 @@ def run_due_daily_sends(window_minutes: int = 20):
         for h in households:
             if not h.notify_me:
                 continue
-            try:
-                hour, minute = (int(x) for x in (h.send_time or "07:00").split(":"))
-            except ValueError:
-                logger.warning("Household %s has an unparseable send_time %r - skipping", h.id, h.send_time)
-                continue
-
-            due_at = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            if not (due_at <= now_local < due_at + dt.timedelta(minutes=window_minutes)):
+            entries = [
+                entry for entry in _schedule_entries_for(h, day_key)
+                if _entry_due(entry, now_local, window_minutes)
+            ]
+            if not entries:
                 continue
 
             items = (
@@ -203,24 +206,20 @@ def run_due_daily_sends(window_minutes: int = 20):
             if not items:
                 logger.warning("No meal plan items for household %s on %s - run weekly_plan_job first", h.id, today)
                 continue
-            selected_meals = set(h.notify_meals or [])
-            items = [it for it in items if it.meal_slot in selected_meals]
-            if not items:
-                continue
-            if all(it.delivery_status == "sent" for it in items):
-                continue  # already sent today, don't resend on the next poll
-
             slot_items = {it.meal_slot: it for it in items}
             sent_any = False
-            for item in items:
-                try:
-                    send_daily_message(h, {item.meal_slot: slot_items[item.meal_slot]}, recipe_cache)
-                    item.sent_at = dt.datetime.utcnow()
-                    item.delivery_status = "sent"
-                    sent_any = True
-                except Exception:
-                    logger.exception("Failed to send %s daily message to household %s", item.meal_slot, h.id)
-                    item.delivery_status = "failed"
+            for entry in entries:
+                for item in _items_for_entry(entry, slot_items):
+                    if item.delivery_status == "sent":
+                        continue
+                    try:
+                        send_daily_message(h, {item.meal_slot: slot_items[item.meal_slot]}, recipe_cache, entry.get("message", ""))
+                        item.sent_at = dt.datetime.utcnow()
+                        item.delivery_status = "sent"
+                        sent_any = True
+                    except Exception:
+                        logger.exception("Failed to send %s daily message to household %s", item.meal_slot, h.id)
+                        item.delivery_status = "failed"
             if sent_any:
                 sent_household_ids.append(h.id)
             session.commit()
@@ -228,6 +227,39 @@ def run_due_daily_sends(window_minutes: int = 20):
         return sent_household_ids
     finally:
         session.close()
+
+
+def _legacy_schedule_entry(household: Household) -> dict:
+    return {
+        "enabled": True,
+        "time": household.send_time or "07:00",
+        "meals": household.notify_meals or ["breakfast", "lunch", "snack", "dinner"],
+        "message": "",
+    }
+
+
+def _schedule_entries_for(household: Household, day_key: str, send_time: str | None = None) -> list[dict]:
+    schedule = household.cook_message_schedule or {}
+    entries = schedule.get(day_key) or []
+    if not entries:
+        entries = [_legacy_schedule_entry(household)]
+    entries = [entry for entry in entries if entry.get("enabled", True) and entry.get("meals")]
+    if send_time:
+        entries = [entry for entry in entries if entry.get("time") == send_time]
+    return entries
+
+
+def _entry_due(entry: dict, now_local: dt.datetime, window_minutes: int) -> bool:
+    try:
+        hour, minute = (int(x) for x in (entry.get("time") or "07:00").split(":"))
+    except ValueError:
+        return False
+    due_at = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return due_at <= now_local < due_at + dt.timedelta(minutes=window_minutes)
+
+
+def _items_for_entry(entry: dict, slot_items: dict) -> list[MealPlanItem]:
+    return [slot_items[slot] for slot in (entry.get("meals") or []) if slot in slot_items]
 
 
 def start_scheduler():

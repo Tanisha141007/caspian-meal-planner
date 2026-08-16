@@ -194,13 +194,13 @@ def register_handler():
     return handle
 
 
-def send_daily_message(household: Household, slot_items: dict, recipe_cache: dict) -> str:
+def send_daily_message(household: Household, slot_items: dict, recipe_cache: dict, extra_message: str = "") -> str:
     """slot_items: {meal_slot: MealPlanItem} for today. Reuses the known
     conversation if the cook has already linked; otherwise cold-starts one
     via initiate() *only* if this connection actually supports it (Telegram
     doesn't - platform-wide restriction, not a Caspian limitation)."""
     client = get_client()
-    text = format_daily_message(household, dt.date.today(), slot_items, recipe_cache)
+    text = format_daily_message(household, dt.date.today(), slot_items, recipe_cache, extra_message)
 
     if household.caspian_conversation_id:
         client.send_message(household.caspian_conversation_id, text=text)
