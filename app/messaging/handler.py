@@ -194,13 +194,17 @@ def register_handler():
     return handle
 
 
-def send_daily_message(household: Household, slot_items: dict, recipe_cache: dict) -> str:
-    """slot_items: {meal_slot: MealPlanItem} for today. Reuses the known
-    conversation if the cook has already linked; otherwise cold-starts one
-    via initiate() *only* if this connection actually supports it (Telegram
-    doesn't - platform-wide restriction, not a Caspian limitation)."""
+def send_daily_message(household: Household, slot_items: dict, recipe_cache: dict, date: dt.date = None) -> str:
+    """slot_items: {meal_slot: MealPlanItem}, one or more slots on `date`
+    (defaults to today - every existing caller passes items that actually
+    are for today, but the header used to hardcode dt.date.today() instead
+    of trusting the caller, which would have mislabeled a future date once
+    notify-cook started supporting one). Reuses the known conversation if
+    the cook has already linked; otherwise cold-starts one via initiate()
+    *only* if this connection actually supports it (Telegram doesn't -
+    platform-wide restriction, not a Caspian limitation)."""
     client = get_client()
-    text = format_daily_message(household, dt.date.today(), slot_items, recipe_cache)
+    text = format_daily_message(household, date or dt.date.today(), slot_items, recipe_cache)
 
     if household.caspian_conversation_id:
         client.send_message(household.caspian_conversation_id, text=text)

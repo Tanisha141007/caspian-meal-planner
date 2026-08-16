@@ -94,3 +94,7 @@ class AskAIRequest(BaseModel):
 
 class NotifyCookRequest(BaseModel):
     date: dt.date | None = None  # defaults to today
+    # If set, sends only this one meal slot (e.g. the Planner tab's "Notify
+    # now" targeting whatever meal is next up) instead of every planned
+    # slot on `date`.
+    slot: str | None = None

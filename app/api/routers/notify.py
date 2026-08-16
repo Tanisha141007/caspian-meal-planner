@@ -26,15 +26,18 @@ def notify_cook(
         .filter(MealPlanItem.household_id == household.id, MealPlanItem.date == date)
         .all()
     )
+    if body.slot:
+        items = [it for it in items if it.meal_slot == body.slot]
     if not items:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No planned meals for {date}")
+        what = f"{body.slot} on {date}" if body.slot else str(date)
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No planned meals for {what}")
 
     recipe_cache = {r.id: r for r in db.query(Recipe).all()}
     slot_items = {it.meal_slot: it for it in items}
 
     try:
         ensure_ready()
-        text = send_daily_message(household, slot_items, recipe_cache)
+        text = send_daily_message(household, slot_items, recipe_cache, date=date)
     except Exception as e:
         for it in items:
             it.delivery_status = "failed"
