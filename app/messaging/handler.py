@@ -289,3 +289,22 @@ def send_owner_email(household: Household, message) -> str:
     result = get_client().initiate(connection["id"], recipient=household.owner_email, text=text)
     _remember_owner_email_conversation(household.id, _conversation_id_from_result(result))
     return text
+
+
+def send_owner_welcome_email(email: str) -> str:
+    """Sends the one-time welcome email to a signed-in account owner."""
+    if not email:
+        raise RuntimeError("Cannot send welcome email without an email address")
+
+    connection = get_email_connection()
+    if "initiate" not in (connection.get("capabilities") or []):
+        raise RuntimeError("Configured Caspian email connection cannot initiate outbound messages")
+
+    text = (
+        "Hi, I'm ahaar.\n\n"
+        "I will help you plan your meals and coordinate with your cook. "
+        "Look out for weekly plans and fresh suggestions from Discover.\n\n"
+        "ahaar"
+    )
+    get_client().initiate(connection["id"], recipient=email, text=text)
+    return text

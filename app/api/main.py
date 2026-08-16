@@ -10,7 +10,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import ask_ai, households, internal, notify, plan, recipes
+from app.api.routers import ask_ai, auth, households, internal, notify, plan, recipes
 from app.config import CASPIAN_API_KEY, CORS_ORIGINS
 from app.db import init_db
 
@@ -29,6 +29,7 @@ app.add_middleware(
 )
 
 app.include_router(households.router)
+app.include_router(auth.router)
 app.include_router(recipes.router)
 app.include_router(plan.router)
 app.include_router(ask_ai.router)
