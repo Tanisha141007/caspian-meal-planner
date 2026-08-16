@@ -11,21 +11,29 @@ REGION_CUISINE_PATH = Path(__file__).parent / "region_cuisine_seed.json"
 def seed_recipes(path: Path = RECIPES_PATH):
     """Load the Indian recipe universe (default: the small hand-curated
     fixture; pass app/data/recipes_ingested.json once scripts/ingest_recipes.py
-    has run) into the DB. Safe to re-run: upserts by recipe id."""
+    has run) into the DB. Safe to re-run: upserts by recipe id.
+
+    Bulk, not per-row get()+setattr()/add(): that was ~2 round-trips per
+    recipe (a SELECT existence check, then an INSERT or UPDATE), which is
+    fine against local SQLite but took several minutes - long enough to
+    time out - against a real network-hop DB (Supabase's pooler, from
+    Render). One SELECT for all existing ids, then one batched INSERT and
+    one batched UPDATE, gets this down to low single-digit seconds."""
     init_db()
     recipes = json.loads(Path(path).read_text())
 
     session = get_session()
     try:
-        for r in recipes:
-            existing = session.get(Recipe, r["id"])
-            if existing:
-                for key, value in r.items():
-                    setattr(existing, key, value)
-            else:
-                session.add(Recipe(**r))
+        existing_ids = {row[0] for row in session.query(Recipe.id).all()}
+        to_insert = [r for r in recipes if r["id"] not in existing_ids]
+        to_update = [r for r in recipes if r["id"] in existing_ids]
+
+        if to_insert:
+            session.bulk_insert_mappings(Recipe, to_insert)
+        if to_update:
+            session.bulk_update_mappings(Recipe, to_update)
         session.commit()
-        print(f"Seeded {len(recipes)} recipes.")
+        print(f"Seeded {len(recipes)} recipes ({len(to_insert)} new, {len(to_update)} updated).")
     finally:
         session.close()
 
