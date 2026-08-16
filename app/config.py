@@ -34,10 +34,10 @@ CORS_ORIGINS = [
 ]
 
 # Supabase project (M3: auth). Empty until configured - app/api/deps.py's
-# auth dependency refuses all requests until SUPABASE_JWT_SECRET is set,
-# rather than silently running open.
+# auth dependency refuses all requests until SUPABASE_URL is set, rather
+# than silently running open. Verification is against the project's public
+# JWKS (see deps.py), not a shared secret - no separate secret to configure.
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
 
 
 def llm_configured() -> bool:
