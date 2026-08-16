@@ -1,16 +1,58 @@
-"""Turns a day's MealPlanItems into the plain-text message sent to the cook.
-Kept to plain ASCII text (no markdown, no emoji) because the interim SMS
-channel bills non-GSM-7 characters as extra segments - see Caspian's
-SMS & phone docs. Swapping to WhatsApp later can loosen this formatting."""
+"""Turns MealPlanItems into the plain-text message sent to the cook."""
 
 import datetime as dt
 from html import escape
 
 from app.config import MEAL_SLOTS
 
-SLOT_LABELS = {"breakfast": "BREAKFAST", "lunch": "LUNCH", "snack": "SNACK", "dinner": "DINNER"}
+SLOT_LABELS = {"breakfast": "नाश्ता", "lunch": "दोपहर का खाना", "snack": "नाश्ता/स्नैक", "dinner": "रात का खाना"}
 SLOT_TITLES = {"breakfast": "Breakfast", "lunch": "Lunch", "snack": "Snack", "dinner": "Dinner"}
 OWNER_TABLE_WIDTHS = {"day": 12, "breakfast": 28, "lunch": 32, "snack": 24, "dinner": 32}
+DEVANAGARI_START = "\u0900"
+DEVANAGARI_END = "\u097f"
+VOWELS = {
+    "aa": ("आ", "ा"),
+    "ai": ("ऐ", "ै"),
+    "au": ("औ", "ौ"),
+    "ee": ("ई", "ी"),
+    "ii": ("ई", "ी"),
+    "oo": ("ऊ", "ू"),
+    "uu": ("ऊ", "ू"),
+    "a": ("अ", ""),
+    "e": ("ए", "े"),
+    "i": ("इ", "ि"),
+    "o": ("ओ", "ो"),
+    "u": ("उ", "ु"),
+}
+CONSONANTS = {
+    "chh": "छ",
+    "kh": "ख",
+    "gh": "घ",
+    "ch": "च",
+    "jh": "झ",
+    "th": "थ",
+    "dh": "ध",
+    "ph": "फ",
+    "bh": "भ",
+    "sh": "श",
+    "k": "क",
+    "g": "ग",
+    "c": "क",
+    "j": "ज",
+    "t": "त",
+    "d": "द",
+    "n": "न",
+    "p": "प",
+    "b": "ब",
+    "m": "म",
+    "y": "य",
+    "r": "र",
+    "l": "ल",
+    "v": "व",
+    "w": "व",
+    "s": "स",
+    "h": "ह",
+}
 
 
 def _fmt_qty(qty: float) -> str:
@@ -51,28 +93,94 @@ def aggregate_ingredients(dish_recipe_ids, portion_servings, recipe_cache):
 
 
 def format_meal_block(slot: str, item, recipe_cache) -> str:
-    label = SLOT_LABELS.get(slot, slot.upper())
+    label = SLOT_LABELS.get(slot, slot)
     names = dish_names(item.dish_recipe_ids, recipe_cache)
-    ingredients = aggregate_ingredients(item.dish_recipe_ids, item.portion_servings, recipe_cache)
-
-    lines = [f"{label} ({_fmt_qty(item.portion_servings)} servings): {names}"]
-    if ingredients:
-        lines.append("Ingredients: " + ", ".join(ingredients))
+    lines = [
+        f"भोजन: {label}",
+        f"डिश: {names}",
+        f"लोग: {_fmt_qty(item.portion_servings)}",
+    ]
     if item.note:
-        lines.append(f"Note: {item.note}")
+        lines.append(f"नोट: {item.note}")
     return "\n".join(lines)
+
+
+def _contains_devanagari(value: str) -> bool:
+    return any(DEVANAGARI_START <= char <= DEVANAGARI_END for char in value)
+
+
+def _next_match(value: str, index: int, tokens: dict) -> str | None:
+    for token in sorted(tokens, key=len, reverse=True):
+        if value.startswith(token, index):
+            return token
+    return None
+
+
+def _transliterate_word(value: str) -> str:
+    result = []
+    index = 0
+    while index < len(value):
+        vowel = _next_match(value, index, VOWELS)
+        if vowel:
+            result.append(VOWELS[vowel][0])
+            index += len(vowel)
+            continue
+
+        consonant = _next_match(value, index, CONSONANTS)
+        if not consonant:
+            result.append(value[index])
+            index += 1
+            continue
+
+        base = CONSONANTS[consonant]
+        index += len(consonant)
+        next_vowel = _next_match(value, index, VOWELS)
+        if next_vowel:
+            result.append(base + VOWELS[next_vowel][1])
+            index += len(next_vowel)
+        elif consonant in {"n", "m"} and _next_match(value, index, CONSONANTS):
+            result.append("ं")
+        else:
+            result.append(base)
+    return "".join(result)
+
+
+def _transliterate_to_hindi(value: str) -> str:
+    if not value or _contains_devanagari(value):
+        return value
+
+    parts = []
+    token = []
+    for char in value:
+        if char.isalpha() and char.isascii():
+            token.append(char.lower())
+            continue
+        if token:
+            parts.append(_transliterate_word("".join(token)))
+            token = []
+        parts.append(char)
+    if token:
+        parts.append(_transliterate_word("".join(token)))
+    return "".join(parts)
+
+
+def _cook_house_label(household) -> str:
+    flat_no = (getattr(household, "flat_no", "") or "").strip()
+    building = (getattr(household, "building", "") or "").strip()
+    parts = [part for part in (flat_no, _transliterate_to_hindi(building)) if part]
+    return ", ".join(parts) if parts else household.name
 
 
 def format_daily_message(household, date: dt.date, slot_items: dict, recipe_cache: dict, extra_message: str = "") -> str:
     """slot_items: {meal_slot: MealPlanItem} for one household on one date."""
-    header = f"{household.name} household - {date.strftime('%a %d %b')} meals for {household.cook_name}:"
+    header = f"घर: {_cook_house_label(household)}\nतारीख: {date.strftime('%d %b %Y')}"
     blocks = [
         format_meal_block(slot, slot_items[slot], recipe_cache)
         for slot in MEAL_SLOTS
         if slot in slot_items
     ]
     if extra_message.strip():
-        blocks.append("Note from family: " + extra_message.strip())
+        blocks.append("परिवार का नोट: " + extra_message.strip())
     return header + "\n\n" + "\n\n".join(blocks)
 
 

@@ -102,6 +102,8 @@ def serialize_household(household) -> dict:
     return {
         "id": household.id,
         "household": household.family_size,
+        "flatNo": household.flat_no or "",
+        "building": household.building or "",
         "location": location,
         "city": household.city or "",
         "state": household.state or "",

@@ -15,6 +15,8 @@ DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sun
 
 class HouseholdCreate(BaseModel):
     name: str
+    flat_no: str = ""
+    building: str = ""
     cook_name: str
     cook_phone: str
     city: str = ""
@@ -50,6 +52,8 @@ class HouseholdCreate(BaseModel):
 
 class HouseholdUpdate(BaseModel):
     name: str | None = None
+    flat_no: str | None = None
+    building: str | None = None
     cook_name: str | None = None
     cook_phone: str | None = None
     city: str | None = None
