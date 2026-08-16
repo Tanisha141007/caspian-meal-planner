@@ -50,7 +50,7 @@ class Household(Base):
     flat_no = Column(String, default="")
     building = Column(String, default="")
     cook_name = Column(String, nullable=False)
-    cook_phone = Column(String, nullable=False, unique=True)  # E.164, e.g. +9198XXXXXXXX
+    cook_phone = Column(String, nullable=False)  # E.164, e.g. +9198XXXXXXXX
     send_time = Column(String, default="07:00")  # HH:MM local time for the daily message
     notify_me = Column(Boolean, default=False)
     notify_meals = Column(JSON, default=lambda: ["breakfast", "lunch", "snack", "dinner"])

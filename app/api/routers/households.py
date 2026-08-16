@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, get_owned_household
@@ -38,7 +39,11 @@ def create_household(
 
     household = Household(owner_user_id=user_id, owner_email=user.get("email"), **body.model_dump())
     db.add(household)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Household already exists - use PATCH to update it")
     return serialize_household(household)
 
 
