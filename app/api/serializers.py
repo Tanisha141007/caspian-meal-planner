@@ -103,6 +103,9 @@ def serialize_household(household) -> dict:
         "cookPhone": household.cook_phone,
         "channel": household.preferred_channel,
         "leadHours": household.lead_hours,
+        "notifyMe": bool(household.notify_me),
+        "notifyMeals": household.notify_meals or ["breakfast", "lunch", "snack", "dinner"],
+        "sendTime": household.send_time or "07:00",
         "notes": household.notes or "",
         # The code the family relays to their cook - the cook's first
         # message to the bot/number must be exactly this. Frontend should
