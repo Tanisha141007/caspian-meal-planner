@@ -26,7 +26,7 @@ from app.config import (
 )
 from app.db import get_session
 from app.meal_planner.generator import interpret_cook_reply
-from app.messaging.formatter import format_daily_message
+from app.messaging.formatter import cook_house_label, format_daily_message
 from app.models import Feedback, Household, MealPlanItem
 
 _client = None
@@ -151,21 +151,25 @@ def register_handler():
     def handle(message):
         session = get_session()
         try:
-            household = _household_for_conversation(session, message.conversation_id)
-
-            if household is None:
-                household = _household_for_link_code(session, message.text)
-                if household is None:
-                    message.reply(
-                        "Hi! I don't recognize this yet - ask the family for your link "
-                        "code and send it to me to get started."
-                    )
-                    return
+            # A cook can serve multiple households. If they send another
+            # household's link code from the same Telegram conversation, link
+            # that household before treating the text as feedback for the
+            # already-known household on this conversation.
+            household = _household_for_link_code(session, message.text)
+            if household is not None:
                 household.caspian_conversation_id = message.conversation_id
                 session.commit()
                 message.reply(
-                    f"You're linked, {household.cook_name}! I'll send {household.name}'s "
+                    f"You're linked, {household.cook_name}! I'll send घर: {cook_house_label(household)} "
                     "meals here as they're planned."
+                )
+                return
+
+            household = _household_for_conversation(session, message.conversation_id)
+            if household is None:
+                message.reply(
+                    "Hi! I don't recognize this yet - ask the family for your link "
+                    "code and send it to me to get started."
                 )
                 return
 

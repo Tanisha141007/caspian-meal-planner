@@ -164,7 +164,7 @@ def _transliterate_to_hindi(value: str) -> str:
     return "".join(parts)
 
 
-def _cook_house_label(household) -> str:
+def cook_house_label(household) -> str:
     flat_no = (getattr(household, "flat_no", "") or "").strip()
     building = (getattr(household, "building", "") or "").strip()
     parts = [part for part in (flat_no, _transliterate_to_hindi(building)) if part]
@@ -173,7 +173,7 @@ def _cook_house_label(household) -> str:
 
 def format_daily_message(household, date: dt.date, slot_items: dict, recipe_cache: dict, extra_message: str = "") -> str:
     """slot_items: {meal_slot: MealPlanItem} for one household on one date."""
-    header = f"घर: {_cook_house_label(household)}\nतारीख: {date.strftime('%d %b %Y')}"
+    header = f"घर: {cook_house_label(household)}\nतारीख: {date.strftime('%d %b %Y')}"
     blocks = [
         format_meal_block(slot, slot_items[slot], recipe_cache)
         for slot in MEAL_SLOTS
