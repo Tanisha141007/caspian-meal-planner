@@ -15,9 +15,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 # "-latest" alias, not a pinned version: Google retires specific model
 # versions over time (confirmed live: gemini-2.5-flash 404s for new keys as
 # of Aug 2026, "no longer available to new users") - the alias auto-tracks
-# whatever their current flash model is, so this doesn't need revisiting
-# every time they rotate models.
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+# whatever their current model is, so this doesn't need revisiting every
+# time they rotate models. "flash-lite" over plain "flash": hit a real
+# 429 RESOURCE_EXHAUSTED on flash-latest's free tier (5 requests/minute on
+# the model it currently points to, gemini-3.7-flash) under completely
+# ordinary use, not a stress test - lite variants are provisioned for
+# higher-volume/cheaper use and are the better fit for an app that calls
+# the LLM on every plan generation and every cook reply.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-lite-latest")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5")
 

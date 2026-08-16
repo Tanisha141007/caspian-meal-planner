@@ -90,24 +90,32 @@ def _anthropic_client():
 
 
 def _generate_gemini(system: str, user: str, max_tokens: int) -> str:
-    from google.genai import types
+    from google.genai import errors, types
 
-    response = _gemini_client().models.generate_content(
-        model=GEMINI_MODEL,
-        contents=user,
-        config=types.GenerateContentConfig(
-            system_instruction=system,
-            max_output_tokens=max_tokens,
-            response_mime_type="application/json",  # Gemini-native JSON mode, no fence-stripping needed
-            # Newer Gemini models "think" before answering by default, which
-            # eats into max_output_tokens and can silently truncate a small
-            # budget before any visible output appears (hit this live: 50
-            # tokens came back empty/truncated, thinking consumed it all).
-            # None of our calls need multi-step reasoning - straightforward
-            # structured extraction/generation - so this is pure overhead.
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-        ),
+    base_kwargs = dict(
+        system_instruction=system,
+        max_output_tokens=max_tokens,
+        response_mime_type="application/json",  # Gemini-native JSON mode, no fence-stripping needed
     )
+    # Some (not all - hit this live, "-lite" models reject it as an invalid
+    # argument) Gemini models "think" before answering by default, which
+    # eats into max_output_tokens and can silently truncate a small budget
+    # before any visible output appears (also hit live: 50 tokens came back
+    # empty, thinking consumed it all). None of our calls need multi-step
+    # reasoning, so disable it where supported; fall back to omitting the
+    # param entirely for models (like GEMINI_MODEL's current default,
+    # gemini-flash-lite-latest) that don't recognize it - future model
+    # swaps shouldn't have to remember this quirk.
+    try:
+        config = types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=0), **base_kwargs
+        )
+        response = _gemini_client().models.generate_content(model=GEMINI_MODEL, contents=user, config=config)
+    except errors.ClientError as e:
+        if "INVALID_ARGUMENT" not in str(e):
+            raise
+        config = types.GenerateContentConfig(**base_kwargs)
+        response = _gemini_client().models.generate_content(model=GEMINI_MODEL, contents=user, config=config)
     return response.text
 
 
