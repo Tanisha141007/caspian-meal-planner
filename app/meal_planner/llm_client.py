@@ -59,6 +59,13 @@ def _generate_gemini(system: str, user: str, max_tokens: int) -> str:
             system_instruction=system,
             max_output_tokens=max_tokens,
             response_mime_type="application/json",  # Gemini-native JSON mode, no fence-stripping needed
+            # Newer Gemini models "think" before answering by default, which
+            # eats into max_output_tokens and can silently truncate a small
+            # budget before any visible output appears (hit this live: 50
+            # tokens came back empty/truncated, thinking consumed it all).
+            # None of our calls need multi-step reasoning - straightforward
+            # structured extraction/generation - so this is pure overhead.
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         ),
     )
     return response.text

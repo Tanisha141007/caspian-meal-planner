@@ -12,7 +12,12 @@ CASPIAN_API_KEY = os.environ.get("CASPIAN_API_KEY", "")
 # fall back to the rule-based path (same pattern as app/web/mock.py).
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "gemini")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# "-latest" alias, not a pinned version: Google retires specific model
+# versions over time (confirmed live: gemini-2.5-flash 404s for new keys as
+# of Aug 2026, "no longer available to new users") - the alias auto-tracks
+# whatever their current flash model is, so this doesn't need revisiting
+# every time they rotate models.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5")
 
