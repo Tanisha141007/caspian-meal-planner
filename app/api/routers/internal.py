@@ -12,9 +12,10 @@ INTERNAL_JOBS_SECRET unset means these 401 unconditionally, never run open.
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.config import INTERNAL_JOBS_SECRET
+from app.data.seed import RECIPES_PATH, seed_recipes, seed_region_cuisine_map
 from app.db import get_session
 from app.messaging.handler import ensure_ready, get_client
-from app.models import AppState
+from app.models import AppState, Recipe
 from app.scheduler.jobs import monthly_rollup_job, run_due_daily_sends, weekly_plan_job
 
 router = APIRouter(prefix="/internal", tags=["internal"])
@@ -87,3 +88,26 @@ def monthly_rollup():
     cron entry - see scheduled-jobs.yml."""
     monthly_rollup_job()
     return {"status": "ok"}
+
+
+@router.post("/seed-recipes", dependencies=[Depends(_verify_secret)])
+def seed_recipes_route():
+    """One-off, not on any schedule: loads the full ~4,262-recipe Kaggle-
+    derived universe (app/data/recipes_ingested.json) plus the region-
+    cuisine map into whatever DB this instance's DATABASE_URL points at.
+    Exists because Render's free tier has no Shell access to run
+    `python -m app.data.seed` directly against production the way we did
+    locally - this is the same operation, reachable over HTTP instead.
+    Safe to re-run (seed_recipes upserts by id)."""
+    ingested_path = RECIPES_PATH.parent / "recipes_ingested.json"
+    path = ingested_path if ingested_path.exists() else RECIPES_PATH
+    seed_recipes(path)
+    seed_region_cuisine_map()
+
+    session = get_session()
+    try:
+        count = session.query(Recipe).count()
+    finally:
+        session.close()
+
+    return {"recipe_count": count, "seeded_from": path.name}
