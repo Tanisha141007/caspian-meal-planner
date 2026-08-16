@@ -1,4 +1,6 @@
 import datetime as dt
+import random
+import string
 
 from sqlalchemy import (
     JSON,
@@ -16,10 +18,21 @@ from sqlalchemy.orm import relationship
 
 from app.db import Base
 
+# Excludes 0/O/1/I - easy to misread when a family reads this code aloud or
+# texts it to their cook.
+_LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def generate_link_code() -> str:
+    return "".join(random.choices(_LINK_CODE_ALPHABET, k=6))
+
 
 class Household(Base):
-    """One family whose cook we message. Maps 1:1 to a phone number today,
-    a WhatsApp identity once Caspian ships connect_whatsapp()."""
+    """One family whose cook we message - over whichever channel the cook's
+    first inbound message arrived on (SMS, Telegram, ...), matched via
+    link_code rather than phone number, since not every channel exposes a
+    stable, known-in-advance identity (Telegram's sender has no phone
+    number at all, for instance)."""
 
     __tablename__ = "households"
 
@@ -54,7 +67,13 @@ class Household(Base):
     notes = Column(Text, default="")  # free-text prefs fed straight into the LLM prompt
 
     active = Column(Boolean, default=True)
-    # Filled in once Caspian's SMS connection exists / the cook has texted at least once.
+    # The code the family relays to their cook - the cook's first message
+    # to the bot/number, whatever it says, must be exactly this code. Once
+    # matched, caspian_conversation_id is filled in and this stops being
+    # needed for that household. Unique so a stray/guessed code can't link
+    # to the wrong household.
+    link_code = Column(String, unique=True, index=True, default=generate_link_code)
+    # Filled in once the cook's first message has matched link_code above.
     caspian_connection_id = Column(String, nullable=True)
     caspian_conversation_id = Column(String, nullable=True)
 

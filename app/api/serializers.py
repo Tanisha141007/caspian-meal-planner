@@ -104,6 +104,11 @@ def serialize_household(household) -> dict:
         "channel": household.preferred_channel,
         "leadHours": household.lead_hours,
         "notes": household.notes or "",
+        # The code the family relays to their cook - the cook's first
+        # message to the bot/number must be exactly this. Frontend should
+        # show this prominently until cookLinked is true.
+        "linkCode": household.link_code,
+        "cookLinked": bool(household.caspian_conversation_id),
     }
 
 

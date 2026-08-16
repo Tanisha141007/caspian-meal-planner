@@ -20,6 +20,11 @@ TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 
+# Telegram bot token (from @BotFather) - free, no card, but the bot can't
+# cold-start a conversation (platform-wide Bot API restriction, not
+# Caspian's) - the cook must message it first. See Household.link_code.
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./caspian_meals.db")
 APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")
 

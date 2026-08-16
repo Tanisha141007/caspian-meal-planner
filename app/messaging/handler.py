@@ -1,22 +1,32 @@
 """Caspian wiring: one on_message handler for every connected channel, plus
-the outbound send used by the daily scheduler job. This is the ONLY file
-that should need to change when WhatsApp goes live on Caspian - swap
-connect_phone(provider="twilio", ...) for connect_whatsapp(...) in
-connect_channel() below; the handler and formatter are channel-agnostic."""
+the outbound send used by the daily scheduler job.
+
+Households are matched to an inbound conversation by Household.link_code,
+not by phone number - not every channel exposes a stable, known-in-advance
+identity the way a phone number does (Telegram's sender has no phone number
+at all unless the bot explicitly requests contact sharing), so "the cook's
+first message must be exactly this code" is the one mechanism that works
+uniformly across every channel Caspian supports."""
 
 import datetime as dt
 import os
 
 from caspian_sdk import CommClient
 
-from app.config import CASPIAN_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
+from app.config import (
+    CASPIAN_API_KEY,
+    TELEGRAM_BOT_TOKEN,
+    TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN,
+    TWILIO_FROM_NUMBER,
+)
 from app.db import get_session
 from app.meal_planner.generator import interpret_cook_reply
 from app.messaging.formatter import format_daily_message
 from app.models import Feedback, Household, MealPlanItem
 
 _client = None
-_phone_connection = None
+_connection = None
 
 
 def get_client() -> CommClient:
@@ -30,45 +40,51 @@ def connect_channel():
     """The one line that names the channel - everything else (handler,
     formatter, scheduler) is channel-agnostic.
 
-    CASPIAN_CHANNEL=sms (default): bring-your-own Twilio number. Confirmed
-    working against Caspian's public docs.
+    CASPIAN_CHANNEL=telegram (current default for this deployment): a free
+    bot via @BotFather, no card ever. Can't cold-start a conversation
+    (Bot API-wide restriction) - see Household.link_code.
+
+    CASPIAN_CHANNEL=sms: bring-your-own Twilio/Telnyx number. Confirmed
+    working against Caspian's docs, but both providers gate real (non-
+    template, non-trial) SMS behind adding billing - not free the way
+    Telegram is.
 
     CASPIAN_CHANNEL=whatsapp: the installed caspian-sdk already exposes
-    connect_whatsapp() / start_whatsapp_onboarding(), which POSTs to a real
-    /v1/connections/whatsapp/onboarding-session endpoint and is billed like
-    the other paid channels (X, iMessage) - even though the public docs
-    site still lists WhatsApp as "coming soon". It may or may not be
-    enabled for your account yet; this path is here so trying it is a
-    one-env-var change, not a code change. See scripts/start_whatsapp_onboarding.py.
+    connect_whatsapp() / start_whatsapp_onboarding() - not yet live on
+    Caspian's gateway as of this session (confirmed via their own
+    SKILL.md and a live client.channels() call). One-env-var change to
+    try later, see scripts/start_whatsapp_onboarding.py.
     """
-    global _phone_connection
-    channel = os.environ.get("CASPIAN_CHANNEL", "sms").lower()
+    global _connection
+    channel = os.environ.get("CASPIAN_CHANNEL", "telegram").lower()
 
     if channel == "whatsapp":
-        _phone_connection = get_client().connect_whatsapp()
-        return _phone_connection
+        _connection = get_client().connect_whatsapp()
+    elif channel == "telegram":
+        _connection = get_client().connect_telegram(bot_token=TELEGRAM_BOT_TOKEN)
+    else:
+        _connection = get_client().connect_phone(
+            provider="twilio",
+            account_sid=TWILIO_ACCOUNT_SID,
+            auth_token=TWILIO_AUTH_TOKEN,
+            from_number=TWILIO_FROM_NUMBER,
+        )
+    return _connection
 
-    _phone_connection = get_client().connect_phone(
-        provider="twilio",
-        account_sid=TWILIO_ACCOUNT_SID,
-        auth_token=TWILIO_AUTH_TOKEN,
-        from_number=TWILIO_FROM_NUMBER,
+
+def _household_for_conversation(session, conversation_id: str):
+    return session.query(Household).filter(Household.caspian_conversation_id == conversation_id).first()
+
+
+def _household_for_link_code(session, text: str):
+    code = (text or "").strip().upper()
+    if not code:
+        return None
+    return (
+        session.query(Household)
+        .filter(Household.link_code == code, Household.caspian_conversation_id.is_(None))
+        .first()
     )
-    return _phone_connection
-
-
-def _extract_phone(message) -> str:
-    # NOTE: confirm this against a real inbound payload once Twilio is wired
-    # up - Caspian's docs describe `sender` as a channel-specific identity
-    # object but don't pin the exact keys for the phone channel.
-    sender = getattr(message, "sender", None) or {}
-    if isinstance(sender, dict):
-        return sender.get("address") or sender.get("phone") or sender.get("id") or ""
-    return str(sender)
-
-
-def _household_for_phone(session, phone: str):
-    return session.query(Household).filter(Household.cook_phone == phone).first()
 
 
 def _ack_for_intent(intent: dict) -> str:
@@ -85,22 +101,25 @@ def register_handler():
 
     @client.on_message
     def handle(message):
-        phone = _extract_phone(message)
         session = get_session()
         try:
-            household = _household_for_phone(session, phone)
-            if household is None:
-                message.reply(
-                    "Thanks for texting! This number isn't linked to a household yet - "
-                    "ask the family to add you."
-                )
-                return
+            household = _household_for_conversation(session, message.conversation_id)
 
-            # Remember the thread so the daily push can reuse send_message()
-            # instead of cold-starting a new conversation every day.
-            if household.caspian_conversation_id != message.conversation_id:
+            if household is None:
+                household = _household_for_link_code(session, message.text)
+                if household is None:
+                    message.reply(
+                        "Hi! I don't recognize this yet - ask the family for your link "
+                        "code and send it to me to get started."
+                    )
+                    return
                 household.caspian_conversation_id = message.conversation_id
                 session.commit()
+                message.reply(
+                    f"You're linked, {household.cook_name}! I'll send {household.name}'s "
+                    "meals here as they're planned."
+                )
+                return
 
             todays_items = (
                 session.query(MealPlanItem)
@@ -129,8 +148,9 @@ def register_handler():
 
 def send_daily_message(household: Household, slot_items: dict, recipe_cache: dict) -> str:
     """slot_items: {meal_slot: MealPlanItem} for today. Reuses the known
-    conversation if the cook has texted before; otherwise cold-starts one
-    via initiate() (requires the connection's "initiate" capability)."""
+    conversation if the cook has already linked; otherwise cold-starts one
+    via initiate() *only* if this connection actually supports it (Telegram
+    doesn't - platform-wide restriction, not a Caspian limitation)."""
     client = get_client()
     text = format_daily_message(household, dt.date.today(), slot_items, recipe_cache)
 
@@ -138,10 +158,16 @@ def send_daily_message(household: Household, slot_items: dict, recipe_cache: dic
         client.send_message(household.caspian_conversation_id, text=text)
         return text
 
-    if _phone_connection is None:
+    if _connection is None:
         raise RuntimeError("connect_channel() must run before the first send")
 
-    result = client.initiate(_phone_connection["id"], recipient=household.cook_phone, text=text)
+    if "initiate" not in (_connection.get("capabilities") or []):
+        raise RuntimeError(
+            f"{household.cook_name} hasn't linked yet - ask them to message the bot/number "
+            f"with the code {household.link_code!r} first (this channel can't cold-start a conversation)."
+        )
+
+    result = client.initiate(_connection["id"], recipient=household.cook_phone, text=text)
     conv_id = result.get("conversation_id") if isinstance(result, dict) else None
     if conv_id:
         session = get_session()
