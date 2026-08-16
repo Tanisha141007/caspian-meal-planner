@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CASPIAN_API_KEY = os.environ.get("CASPIAN_API_KEY", "")
+CASPIAN_EMAIL_CONNECTION_ID = os.environ.get("CASPIAN_EMAIL_CONNECTION_ID", "")
+CASPIAN_EMAIL_USERNAME = os.environ.get("CASPIAN_EMAIL_USERNAME", "")
+CASPIAN_EMAIL_DOMAIN = os.environ.get("CASPIAN_EMAIL_DOMAIN", "")
 
 # Which LLM backs the meal-plan generator and the "Ask AI" free-text parser.
 # "gemini" (default): Google AI Studio's free tier - no card, no expiry, see
