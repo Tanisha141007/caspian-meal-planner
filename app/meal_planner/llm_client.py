@@ -6,6 +6,7 @@ ANTHROPIC_API_KEY) to swap to Claude instead - callers never change either
 way, they just call generate_json(system, user)."""
 
 import json
+import time
 
 from app.config import (
     ANTHROPIC_API_KEY,
@@ -17,6 +18,45 @@ from app.config import (
 
 _client = None
 _client_provider = None
+
+# Free-tier Gemini genuinely returns "503 UNAVAILABLE... currently
+# experiencing high demand" under real, ordinary load - hit this live, not
+# hypothetical. Retried with backoff since it's transient by definition;
+# NOT retried are 4xx-type errors (bad request, auth, model-not-found) -
+# those need a code/config fix, not another attempt.
+_MAX_ATTEMPTS = 3
+_BACKOFF_SECONDS = (1, 3)
+
+
+def _is_retryable(exc: Exception) -> bool:
+    try:
+        from google.genai.errors import ServerError
+
+        if isinstance(exc, ServerError):
+            return True
+    except ImportError:
+        pass
+    try:
+        from anthropic import APIConnectionError, APITimeoutError, InternalServerError, OverloadedError, RateLimitError
+
+        if isinstance(exc, (InternalServerError, OverloadedError, APIConnectionError, APITimeoutError, RateLimitError)):
+            return True
+    except ImportError:
+        pass
+    return False
+
+
+def _with_retry(fn):
+    last_exc = None
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            return fn()
+        except Exception as e:
+            last_exc = e
+            if not _is_retryable(e) or attempt == _MAX_ATTEMPTS - 1:
+                raise
+            time.sleep(_BACKOFF_SECONDS[min(attempt, len(_BACKOFF_SECONDS) - 1)])
+    raise last_exc  # pragma: no cover - loop always returns or raises above
 
 
 def _parse_json(text: str) -> dict:
@@ -84,9 +124,12 @@ def _generate_anthropic(system: str, user: str, max_tokens: int) -> str:
 def generate_json(system: str, user: str, max_tokens: int = 4000) -> dict:
     """Runs one system+user prompt through the configured provider and
     parses the response as JSON. Both prompt builders already instruct the
-    model to respond with JSON only."""
+    model to respond with JSON only. Transient upstream errors (Gemini's
+    free-tier "high demand" 503s, Anthropic overload/rate-limit) are
+    retried with backoff - anything else (bad request, auth, unsupported
+    model) fails immediately since retrying won't fix it."""
     if LLM_PROVIDER == "anthropic":
-        text = _generate_anthropic(system, user, max_tokens)
+        text = _with_retry(lambda: _generate_anthropic(system, user, max_tokens))
     else:
-        text = _generate_gemini(system, user, max_tokens)
+        text = _with_retry(lambda: _generate_gemini(system, user, max_tokens))
     return _parse_json(text)
