@@ -12,3 +12,4 @@ alembic>=1.13
 psycopg2-binary>=2.9
 pandas>=2.2
 pyjwt>=2.8
+certifi>=2024.2.2

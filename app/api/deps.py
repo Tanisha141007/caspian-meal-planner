@@ -9,6 +9,9 @@ data to significant security vulnerabilities"), and newer projects may not
 even expose one in the classic form. See
 https://supabase.com/docs/guides/auth/jwts."""
 
+import ssl
+
+import certifi
 import jwt as pyjwt
 from fastapi import Depends, Header, HTTPException, status
 from jwt import PyJWKClient
@@ -24,10 +27,19 @@ _jwks_client = None
 def _get_jwks_client() -> PyJWKClient:
     global _jwks_client
     if _jwks_client is None:
+        # Explicit certifi CA bundle rather than relying on the host
+        # Python's default trust store - hit this live: a python.org-
+        # installed Python on macOS has no system CA store wired up by
+        # default, so the JWKS fetch failed with CERTIFICATE_VERIFY_FAILED
+        # until this was explicit. Harmless/redundant on hosts that already
+        # have a working default (most Linux deploys), so safe everywhere.
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
         # cache_keys=True: caches fetched signing keys, only refetches the
         # JWKS document when it sees a `kid` it doesn't recognize yet (e.g.
         # after Supabase rotates keys) - not on every request.
-        _jwks_client = PyJWKClient(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json", cache_keys=True)
+        _jwks_client = PyJWKClient(
+            f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json", cache_keys=True, ssl_context=ssl_context
+        )
     return _jwks_client
 
 
