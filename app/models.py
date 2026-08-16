@@ -172,3 +172,17 @@ class Feedback(Base):
     raw_text = Column(Text, nullable=False)
     parsed_intent = Column(JSON, default=dict)  # {"type": "dislike", "recipe_id": "...", ...}
     created_at = Column(DateTime, default=dt.datetime.utcnow)
+
+
+class AppState(Base):
+    """Small key-value store for cross-invocation state that doesn't belong
+    to any one household - currently just the Caspian event-poll cursor
+    (M5: Render's free tier has no persistent worker, so inbound messages
+    are drained via a periodic one-shot dispatch_pending() instead of
+    client.listen()'s infinite loop - the cursor has to live somewhere
+    between those separate invocations)."""
+
+    __tablename__ = "app_state"
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=True)

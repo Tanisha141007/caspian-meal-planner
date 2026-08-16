@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: caspian-meal-planner-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    # No release/pre-deploy command needed: app/db.py::init_db() already
+    # runs `alembic upgrade head` at import time (app/api/main.py calls it
+    # before the app object is built), so every deploy migrates itself on
+    # boot - Render's free tier doesn't support a separate pre-deploy step
+    # anyway, and this needed no workaround.
+    envVars:
+      - key: CASPIAN_API_KEY
+        sync: false
+      - key: CASPIAN_BASE_URL
+        value: https://api.trycaspianai.com
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-flash-lite-latest
+      - key: CASPIAN_CHANNEL
+        value: telegram
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # Supabase Postgres connection string (Project Settings -> Database
+      # -> Connection string -> URI, use the "Session pooler" one on port
+      # 6543 - Render's outbound IPs aren't static on the free plan, and
+      # the pooler handles that better than a direct connection does).
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_TIMEZONE
+        value: Asia/Kolkata
+      # The deployed mealtime-harmony (Cloudflare Pages) URL, once known -
+      # e.g. https://mealtime-harmony.pages.dev. Comma-separate if there's
+      # more than one (a Pages preview URL plus the production one).
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      # Shared secret the GitHub Actions workflow sends as X-Internal-Secret
+      # - must match the INTERNAL_JOBS_SECRET repo secret in GitHub exactly.
+      - key: INTERNAL_JOBS_SECRET
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.13.0

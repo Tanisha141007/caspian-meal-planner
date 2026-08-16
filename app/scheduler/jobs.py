@@ -101,6 +101,70 @@ def daily_send_job(send_time: str = None):
         session.close()
 
 
+def run_due_daily_sends(window_minutes: int = 20):
+    """The M5 replacement for start_scheduler()'s "one cron trigger per
+    distinct send_time" - that model needs a long-lived process, which
+    Render's free tier doesn't give us (see app/api/routers/internal.py).
+    Instead this runs on every external trigger (GitHub Actions, ~every 15
+    min) and checks each active household's send_time against the current
+    local time itself, sending if due and not already sent today. Keeps
+    real per-household custom timing (the originally-scoped feature)
+    despite the coarser, externally-driven interval - window_minutes is
+    slack against that interval so a household is never skipped because a
+    trigger landed a few minutes early or late."""
+    from zoneinfo import ZoneInfo
+
+    from app.config import APP_TIMEZONE
+
+    now_local = dt.datetime.now(ZoneInfo(APP_TIMEZONE))
+    today = now_local.date()
+
+    session = get_session()
+    try:
+        households = session.query(Household).filter(Household.active.is_(True)).all()
+        recipe_cache = {r.id: r for r in session.query(Recipe).all()}
+        sent_household_ids = []
+
+        for h in households:
+            try:
+                hour, minute = (int(x) for x in (h.send_time or "07:00").split(":"))
+            except ValueError:
+                logger.warning("Household %s has an unparseable send_time %r - skipping", h.id, h.send_time)
+                continue
+
+            due_at = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if not (due_at <= now_local < due_at + dt.timedelta(minutes=window_minutes)):
+                continue
+
+            items = (
+                session.query(MealPlanItem)
+                .filter(MealPlanItem.household_id == h.id, MealPlanItem.date == today)
+                .all()
+            )
+            if not items:
+                logger.warning("No meal plan items for household %s on %s - run weekly_plan_job first", h.id, today)
+                continue
+            if all(it.delivery_status == "sent" for it in items):
+                continue  # already sent today, don't resend on the next poll
+
+            slot_items = {it.meal_slot: it for it in items}
+            try:
+                send_daily_message(h, slot_items, recipe_cache)
+                for it in items:
+                    it.sent_at = dt.datetime.utcnow()
+                    it.delivery_status = "sent"
+                sent_household_ids.append(h.id)
+            except Exception:
+                logger.exception("Failed to send daily message to household %s", h.id)
+                for it in items:
+                    it.delivery_status = "failed"
+            session.commit()
+
+        return sent_household_ids
+    finally:
+        session.close()
+
+
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
 

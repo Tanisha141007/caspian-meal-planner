@@ -72,6 +72,22 @@ def connect_channel():
     return _connection
 
 
+_ready = False
+
+
+def ensure_ready():
+    """Idempotent connect_channel() + register_handler() - the one thing
+    every entry point that needs to send/receive (the API's startup, the
+    internal poll-messages job, ad-hoc scripts) should call instead of
+    invoking connect_channel() directly, so a channel only ever gets
+    connected once per process regardless of how many places call this."""
+    global _ready
+    if not _ready:
+        connect_channel()
+        register_handler()
+        _ready = True
+
+
 def _household_for_conversation(session, conversation_id: str):
     return session.query(Household).filter(Household.caspian_conversation_id == conversation_id).first()
 

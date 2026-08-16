@@ -56,6 +56,16 @@ CORS_ORIGINS = [
 # JWKS (see deps.py), not a shared secret - no separate secret to configure.
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 
+# M5: Render's free tier is web-service-only (no persistent worker/cron), so
+# the polling and scheduled jobs (dispatch_pending, daily send, weekly plan,
+# monthly rollup) that would otherwise run in-process via start_scheduler()
+# instead live behind app/api/routers/internal.py, triggered externally on a
+# schedule (GitHub Actions) - see app/api/routers/internal.py. Gated on a
+# shared secret header, not a user JWT, since there's no user on the other
+# end. Empty by default so a misconfigured deploy 503s these routes instead
+# of running them open.
+INTERNAL_JOBS_SECRET = os.environ.get("INTERNAL_JOBS_SECRET", "")
+
 
 def llm_configured() -> bool:
     """True once whichever provider LLM_PROVIDER points at has a key set."""

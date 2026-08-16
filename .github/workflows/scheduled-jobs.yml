@@ -1,0 +1,50 @@
+name: Scheduled jobs
+
+# Render's free web-service tier has no persistent worker or cron of its
+# own, so the jobs that used to run in-process via
+# app/scheduler/jobs.py::start_scheduler() (inbound message polling, the
+# daily cook message, the weekly chart, the monthly shopping list) are
+# triggered from here instead, against app/api/routers/internal.py's
+# shared-secret-protected routes. See that file for what each route does.
+#
+# Repo secrets required (Settings -> Secrets and variables -> Actions):
+#   API_BASE_URL         e.g. https://caspian-meal-planner.onrender.com
+#   INTERNAL_JOBS_SECRET  same value as the API's INTERNAL_JOBS_SECRET env var
+
+on:
+  schedule:
+    # Every 15 min, all day: drains inbound Telegram replies and sends any
+    # household's daily meal message whose configured send_time is now due
+    # (run_due_daily_sends() checks each household's own send_time, not a
+    # fixed time - see app/scheduler/jobs.py).
+    - cron: "*/15 * * * *"
+    # Sunday 20:00 IST (Asia/Kolkata, UTC+5:30) = 14:30 UTC - generates next
+    # week's chart for every active household.
+    - cron: "30 14 * * 0"
+    # 1st of the month, 08:00 IST = 02:30 UTC - rolls up last month's
+    # ingredients into one shopping list per household.
+    - cron: "30 2 1 * *"
+  workflow_dispatch: {} # manual "Run workflow" button, for testing - runs the frequent job
+
+jobs:
+  run-jobs:
+    runs-on: ubuntu-latest
+    env:
+      API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      INTERNAL_JOBS_SECRET: ${{ secrets.INTERNAL_JOBS_SECRET }}
+    steps:
+      - name: Poll messages + send due daily meals
+        if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          curl -sf -X POST "$API_BASE_URL/internal/poll-messages" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
+          echo
+          curl -sf -X POST "$API_BASE_URL/internal/daily-send" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
+          echo
+
+      - name: Generate next week's plan
+        if: github.event.schedule == '30 14 * * 0'
+        run: curl -sf -X POST "$API_BASE_URL/internal/weekly-plan" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
+
+      - name: Monthly shopping-list rollup
+        if: github.event.schedule == '30 2 1 * *'
+        run: curl -sf -X POST "$API_BASE_URL/internal/monthly-rollup" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
