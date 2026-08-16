@@ -112,12 +112,42 @@ def serialize_household(household) -> dict:
     }
 
 
-def serialize_day_plan(date, items_by_slot: dict) -> dict:
-    """Matches src/lib/planner.tsx's DayPlan: {date, meals: [{slot, recipeId}]}.
-    A meal_slot backed by a dish *combo* (lunch/dinner: dal + rice + roti)
-    collapses to the combo's first recipe_id for the frontend's single-
-    recipe-per-slot card - see the `dishRecipeIds` passthrough below for the
-    full combo, used when the frontend needs every dish, not just the hero one."""
+def _serialize_combo_recipe(dish_recipe_ids: list, recipe_cache: dict) -> dict:
+    """A meal slot backed by a dish *combo* (lunch/dinner: dal + rice + roti)
+    collapses to one Recipe-shaped object the frontend can render directly
+    (MealCard etc. expect a single `recipe`, not a list of dishes) - name is
+    the joined dish names, ingredients are merged across the combo but kept
+    **per-serving** (aggregate_ingredients_structured with a 1.0 multiplier)
+    since the frontend already scales by household size client-side
+    (usePlanner().scaled()) - scaling here too would double it. minutes is
+    the slowest dish in the combo."""
+    from app.messaging.formatter import aggregate_ingredients_structured, dish_names
+
+    primary = recipe_cache.get(dish_recipe_ids[0]) if dish_recipe_ids else None
+    known = [recipe_cache[rid] for rid in dish_recipe_ids if rid in recipe_cache]
+    ingredients = aggregate_ingredients_structured(dish_recipe_ids, 1.0, recipe_cache)
+
+    return {
+        "id": dish_recipe_ids[0] if dish_recipe_ids else "",
+        "name": dish_names(dish_recipe_ids, recipe_cache),
+        "region": CUISINE_DISPLAY_NAMES.get(primary.cuisine_style, primary.region or "Pan-India")
+        if primary
+        else "Pan-India",
+        "slots": primary.meal_types if primary else [],
+        "diet": DIET_BACKEND_TO_FRONTEND.get(primary.diet, "veg") if primary else "veg",
+        "category": CATEGORY_BACKEND_TO_FRONTEND.get(primary.main_ingredient_category, "mixed") if primary else "mixed",
+        "season": SEASON_BACKEND_TO_FRONTEND.get((primary.season_tags or ["all-season"])[0], "all") if primary else "all",
+        "minutes": max((r.prep_time_min for r in known), default=30),
+        "art": _art_for(primary) if primary else "curry",
+        "ingredients": [{"name": i["item"], "qty": i["qty"], "unit": i["unit"]} for i in ingredients],
+    }
+
+
+def serialize_day_plan(date, items_by_slot: dict, recipe_cache: dict) -> dict:
+    """Matches src/lib/planner.tsx's DayPlan: {date, meals: [{slot, recipeId,
+    recipe}]}. `recipe` is fully embedded (see _serialize_combo_recipe) so
+    the frontend never needs a separate recipe lookup to render a meal card -
+    `dishRecipeIds` stays available for anything that needs the raw combo."""
     meals = []
     for slot, item in items_by_slot.items():
         ids = item.dish_recipe_ids or []
@@ -130,6 +160,7 @@ def serialize_day_plan(date, items_by_slot: dict) -> dict:
                 "dishRecipeIds": ids,
                 "servings": item.portion_servings,
                 "note": item.note,
+                "recipe": _serialize_combo_recipe(ids, recipe_cache),
             }
         )
     return {"date": str(date), "meals": meals}

@@ -38,7 +38,9 @@ APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")
 CORS_ORIGINS = [
     o.strip()
     for o in os.environ.get(
-        "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8787"
+        # 8080: mealtime-harmony's actual `vite dev` port (confirmed live),
+        # 5173/3000/8787: common Vite/Cloudflare dev port fallbacks
+        "CORS_ORIGINS", "http://localhost:8080,http://localhost:3000,http://localhost:5173,http://localhost:8787"
     ).split(",")
     if o.strip()
 ]

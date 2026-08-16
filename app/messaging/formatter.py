@@ -20,10 +20,12 @@ def dish_names(dish_recipe_ids, recipe_cache) -> str:
     return " + ".join(names) if names else "(recipe not found)"
 
 
-def aggregate_ingredients(dish_recipe_ids, portion_servings, recipe_cache):
+def aggregate_ingredients_structured(dish_recipe_ids, portion_servings, recipe_cache):
     """Sums ingredient quantities across every dish in a meal slot, scaled
     to the household's portion size, merging items that repeat across dishes
-    (e.g. ghee used in both the dal and the rice)."""
+    (e.g. ghee used in both the dal and the rice). Structured {item, qty,
+    unit} dicts - the one source of truth both the SMS/Telegram formatter
+    below and app/api/serializers.py's embedded recipe data build on."""
     totals = {}
     order = []
     for rid in dish_recipe_ids:
@@ -36,7 +38,13 @@ def aggregate_ingredients(dish_recipe_ids, portion_servings, recipe_cache):
                 totals[key] = 0.0
                 order.append(key)
             totals[key] += ing["qty"] * portion_servings
-    return [f"{item} {_fmt_qty(totals[(item, unit)])} {unit}" for item, unit in order]
+    return [{"item": item, "qty": round(totals[(item, unit)], 3), "unit": unit} for item, unit in order]
+
+
+def aggregate_ingredients(dish_recipe_ids, portion_servings, recipe_cache):
+    """Display-string form ("onion 240 g") for the cook-facing text message."""
+    structured = aggregate_ingredients_structured(dish_recipe_ids, portion_servings, recipe_cache)
+    return [f"{i['item']} {_fmt_qty(i['qty'])} {i['unit']}" for i in structured]
 
 
 def format_meal_block(slot: str, item, recipe_cache) -> str:

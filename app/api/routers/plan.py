@@ -8,7 +8,7 @@ from app.api.schemas import AssignRequest, GenerateWeekRequest, SwapRequest
 from app.api.serializers import serialize_day_plan
 from app.config import llm_configured
 from app.meal_planner.generator import generate_weekly_plan, regenerate_single_meal
-from app.models import Household, MealPlan, MealPlanItem
+from app.models import Household, MealPlan, MealPlanItem, Recipe
 
 _LLM_NOT_CONFIGURED = "No LLM provider key configured yet (GEMINI_API_KEY/ANTHROPIC_API_KEY) - can't generate a plan"
 
@@ -17,6 +17,15 @@ router = APIRouter(prefix="/api/households/{household_id}/plan", tags=["plan"])
 
 def _this_monday(date: dt.date) -> dt.date:
     return date - dt.timedelta(days=date.weekday())
+
+
+def _recipe_cache_for(db, items: list) -> dict:
+    """Only the recipes actually referenced by these items, not the whole
+    table - serialize_day_plan needs full Recipe objects to embed."""
+    ids = {rid for it in items for rid in (it.dish_recipe_ids or [])}
+    if not ids:
+        return {}
+    return {r.id: r for r in db.query(Recipe).filter(Recipe.id.in_(ids)).all()}
 
 
 def _week_days(db, household_id: int, week_start: dt.date) -> list:
@@ -44,11 +53,15 @@ def _week_days(db, household_id: int, week_start: dt.date) -> list:
         )
         .all()
     )
+    recipe_cache = _recipe_cache_for(db, items)
     by_date = defaultdict(dict)
     for it in items:
         by_date[it.date][it.meal_slot] = it
 
-    return [serialize_day_plan(week_start + dt.timedelta(days=o), by_date.get(week_start + dt.timedelta(days=o), {})) for o in range(7)]
+    return [
+        serialize_day_plan(week_start + dt.timedelta(days=o), by_date.get(week_start + dt.timedelta(days=o), {}), recipe_cache)
+        for o in range(7)
+    ]
 
 
 def _get_or_create_plan_for_date(db, household_id: int, date: dt.date) -> MealPlan:
@@ -115,11 +128,12 @@ def assign_meal(body: AssignRequest, household: Household = Depends(get_owned_ho
     else:
         item.dish_recipe_ids = [body.recipe_id]
     db.commit()
-    return serialize_day_plan(body.date, {body.slot: item})
+    recipe_cache = _recipe_cache_for(db, [item])
+    return serialize_day_plan(body.date, {body.slot: item}, recipe_cache)
 
 
 @router.post("/swap")
-def swap_meal(body: SwapRequest, household: Household = Depends(get_owned_household)):
+def swap_meal(body: SwapRequest, household: Household = Depends(get_owned_household), db=Depends(get_db)):
     """The frontend's per-meal swap button - regenerates ONE slot via the
     LLM (candidate-narrowed, excludes the rest of this week + the 14-day
     lookback) without touching anything else in the week."""
@@ -131,4 +145,5 @@ def swap_meal(body: SwapRequest, household: Household = Depends(get_owned_househ
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
     except Exception as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Swap failed: {e}") from e
-    return serialize_day_plan(body.date, {body.slot: item})
+    recipe_cache = _recipe_cache_for(db, [item])
+    return serialize_day_plan(body.date, {body.slot: item}, recipe_cache)
