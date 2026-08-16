@@ -50,6 +50,8 @@ class Household(Base):
     cook_name = Column(String, nullable=False)
     cook_phone = Column(String, nullable=False, unique=True)  # E.164, e.g. +9198XXXXXXXX
     send_time = Column(String, default="07:00")  # HH:MM local time for the daily message
+    notify_me = Column(Boolean, default=False)
+    notify_meals = Column(JSON, default=lambda: ["breakfast", "lunch", "snack", "dinner"])
     # Stored per household for the Preferences UI, but a Caspian connection
     # is one channel for the whole deployment today (CASPIAN_CHANNEL in
     # app/config.py) - per-household channel routing isn't wired up yet.

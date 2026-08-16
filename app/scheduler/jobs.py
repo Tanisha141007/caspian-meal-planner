@@ -131,25 +131,28 @@ def daily_send_job(send_time: str = None):
         recipe_cache = {r.id: r for r in session.query(Recipe).all()}
 
         for h in households:
+            if not h.notify_me:
+                continue
             items = (
                 session.query(MealPlanItem)
                 .filter(MealPlanItem.household_id == h.id, MealPlanItem.date == today)
                 .all()
             )
+            selected_meals = set(h.notify_meals or [])
+            items = [it for it in items if it.meal_slot in selected_meals]
             if not items:
                 logger.warning("No meal plan items for household %s on %s - run weekly_plan_job first", h.id, today)
                 continue
 
             slot_items = {it.meal_slot: it for it in items}
-            try:
-                send_daily_message(h, slot_items, recipe_cache)
-                for it in items:
-                    it.sent_at = dt.datetime.utcnow()
-                    it.delivery_status = "sent"
-            except Exception:
-                logger.exception("Failed to send daily message to household %s", h.id)
-                for it in items:
-                    it.delivery_status = "failed"
+            for item in items:
+                try:
+                    send_daily_message(h, {item.meal_slot: slot_items[item.meal_slot]}, recipe_cache)
+                    item.sent_at = dt.datetime.utcnow()
+                    item.delivery_status = "sent"
+                except Exception:
+                    logger.exception("Failed to send %s daily message to household %s", item.meal_slot, h.id)
+                    item.delivery_status = "failed"
             session.commit()
     finally:
         session.close()
@@ -180,6 +183,8 @@ def run_due_daily_sends(window_minutes: int = 20):
         sent_household_ids = []
 
         for h in households:
+            if not h.notify_me:
+                continue
             try:
                 hour, minute = (int(x) for x in (h.send_time or "07:00").split(":"))
             except ValueError:
@@ -198,20 +203,26 @@ def run_due_daily_sends(window_minutes: int = 20):
             if not items:
                 logger.warning("No meal plan items for household %s on %s - run weekly_plan_job first", h.id, today)
                 continue
+            selected_meals = set(h.notify_meals or [])
+            items = [it for it in items if it.meal_slot in selected_meals]
+            if not items:
+                continue
             if all(it.delivery_status == "sent" for it in items):
                 continue  # already sent today, don't resend on the next poll
 
             slot_items = {it.meal_slot: it for it in items}
-            try:
-                send_daily_message(h, slot_items, recipe_cache)
-                for it in items:
-                    it.sent_at = dt.datetime.utcnow()
-                    it.delivery_status = "sent"
+            sent_any = False
+            for item in items:
+                try:
+                    send_daily_message(h, {item.meal_slot: slot_items[item.meal_slot]}, recipe_cache)
+                    item.sent_at = dt.datetime.utcnow()
+                    item.delivery_status = "sent"
+                    sent_any = True
+                except Exception:
+                    logger.exception("Failed to send %s daily message to household %s", item.meal_slot, h.id)
+                    item.delivery_status = "failed"
+            if sent_any:
                 sent_household_ids.append(h.id)
-            except Exception:
-                logger.exception("Failed to send daily message to household %s", h.id)
-                for it in items:
-                    it.delivery_status = "failed"
             session.commit()
 
         return sent_household_ids

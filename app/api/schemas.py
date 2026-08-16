@@ -4,11 +4,12 @@ sync, FastAPI just serializes whatever the serializer returns."""
 
 import datetime as dt
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 DIET_TYPES = ("veg", "vegan", "jain", "eggetarian", "non-veg")
 SPICE_LEVELS = ("mild", "medium", "hot")
 CHANNELS = ("sms", "whatsapp")
+MEAL_SLOTS = ("breakfast", "lunch", "snack", "dinner")
 
 
 class HouseholdCreate(BaseModel):
@@ -27,6 +28,17 @@ class HouseholdCreate(BaseModel):
     notes: str = ""
     preferred_channel: str = Field(default="sms", pattern="|".join(CHANNELS))
     lead_hours: int = Field(default=12, ge=1, le=48)
+    notify_me: bool = False
+    notify_meals: list[str] = Field(default_factory=lambda: ["breakfast", "lunch", "snack", "dinner"])
+    send_time: str = Field(default="07:00", pattern=r"^\d{2}:\d{2}$")
+
+    @field_validator("notify_meals")
+    @classmethod
+    def valid_notify_meals(cls, value: list[str]) -> list[str]:
+        invalid = [slot for slot in value if slot not in MEAL_SLOTS]
+        if invalid:
+            raise ValueError(f"Invalid meal slot(s): {', '.join(invalid)}")
+        return value
 
 
 class HouseholdUpdate(BaseModel):
@@ -45,6 +57,19 @@ class HouseholdUpdate(BaseModel):
     notes: str | None = None
     preferred_channel: str | None = Field(default=None, pattern="|".join(CHANNELS))
     lead_hours: int | None = Field(default=None, ge=1, le=48)
+    notify_me: bool | None = None
+    notify_meals: list[str] | None = None
+    send_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
+
+    @field_validator("notify_meals")
+    @classmethod
+    def valid_notify_meals(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        invalid = [slot for slot in value if slot not in MEAL_SLOTS]
+        if invalid:
+            raise ValueError(f"Invalid meal slot(s): {', '.join(invalid)}")
+        return value
 
 
 class GenerateWeekRequest(BaseModel):
