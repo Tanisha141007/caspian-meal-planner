@@ -10,6 +10,7 @@ DIET_TYPES = ("veg", "vegan", "jain", "eggetarian", "non-veg")
 SPICE_LEVELS = ("mild", "medium", "hot")
 CHANNELS = ("sms", "whatsapp")
 MEAL_SLOTS = ("breakfast", "lunch", "snack", "dinner")
+DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
 
 class HouseholdCreate(BaseModel):
@@ -31,6 +32,7 @@ class HouseholdCreate(BaseModel):
     notify_me: bool = False
     notify_meals: list[str] = Field(default_factory=lambda: ["breakfast", "lunch", "snack", "dinner"])
     send_time: str = Field(default="07:00", pattern=r"^\d{2}:\d{2}$")
+    cook_message_schedule: dict[str, list[dict]] = Field(default_factory=dict)
 
     @field_validator("notify_meals")
     @classmethod
@@ -39,6 +41,11 @@ class HouseholdCreate(BaseModel):
         if invalid:
             raise ValueError(f"Invalid meal slot(s): {', '.join(invalid)}")
         return value
+
+    @field_validator("cook_message_schedule")
+    @classmethod
+    def valid_cook_message_schedule(cls, value: dict[str, list[dict]]) -> dict[str, list[dict]]:
+        return _valid_cook_message_schedule(value)
 
 
 class HouseholdUpdate(BaseModel):
@@ -60,6 +67,7 @@ class HouseholdUpdate(BaseModel):
     notify_me: bool | None = None
     notify_meals: list[str] | None = None
     send_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
+    cook_message_schedule: dict[str, list[dict]] | None = None
 
     @field_validator("notify_meals")
     @classmethod
@@ -70,6 +78,30 @@ class HouseholdUpdate(BaseModel):
         if invalid:
             raise ValueError(f"Invalid meal slot(s): {', '.join(invalid)}")
         return value
+
+    @field_validator("cook_message_schedule")
+    @classmethod
+    def valid_cook_message_schedule(cls, value: dict[str, list[dict]] | None) -> dict[str, list[dict]] | None:
+        if value is None:
+            return value
+        return _valid_cook_message_schedule(value)
+
+
+def _valid_cook_message_schedule(value: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    for day, entries in value.items():
+        if day not in DAYS:
+            raise ValueError(f"Invalid day: {day}")
+        if not isinstance(entries, list):
+            raise ValueError(f"Schedule for {day} must be a list")
+        for entry in entries:
+            time = entry.get("time", "")
+            if not isinstance(time, str) or len(time.split(":")) != 2:
+                raise ValueError(f"Invalid time for {day}")
+            meals = entry.get("meals", [])
+            invalid = [slot for slot in meals if slot not in MEAL_SLOTS]
+            if invalid:
+                raise ValueError(f"Invalid meal slot(s): {', '.join(invalid)}")
+    return value
 
 
 class GenerateWeekRequest(BaseModel):

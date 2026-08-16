@@ -63,7 +63,7 @@ def format_meal_block(slot: str, item, recipe_cache) -> str:
     return "\n".join(lines)
 
 
-def format_daily_message(household, date: dt.date, slot_items: dict, recipe_cache: dict) -> str:
+def format_daily_message(household, date: dt.date, slot_items: dict, recipe_cache: dict, extra_message: str = "") -> str:
     """slot_items: {meal_slot: MealPlanItem} for one household on one date."""
     header = f"{household.name} household - {date.strftime('%a %d %b')} meals for {household.cook_name}:"
     blocks = [
@@ -71,6 +71,8 @@ def format_daily_message(household, date: dt.date, slot_items: dict, recipe_cach
         for slot in MEAL_SLOTS
         if slot in slot_items
     ]
+    if extra_message.strip():
+        blocks.append("Note from family: " + extra_message.strip())
     return header + "\n\n" + "\n\n".join(blocks)
 
 

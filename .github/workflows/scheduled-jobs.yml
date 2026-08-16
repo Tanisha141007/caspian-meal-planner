@@ -43,8 +43,10 @@ jobs:
 
       - name: Generate next week's plan + owner email
         if: github.event.schedule == '30 14 * * 0'
-        run: curl -sf -X POST "$API_BASE_URL/internal/weekly-plan" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
+        run: |
+          curl -sf -X POST "$API_BASE_URL/internal/weekly-plan" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
 
       - name: Monthly shopping-list rollup
         if: github.event.schedule == '30 2 1 * *'
-        run: curl -sf -X POST "$API_BASE_URL/internal/monthly-rollup" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
+        run: |
+          curl -sf -X POST "$API_BASE_URL/internal/monthly-rollup" -H "X-Internal-Secret: $INTERNAL_JOBS_SECRET"
